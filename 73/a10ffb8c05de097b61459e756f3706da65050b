@@ -1,0 +1,17 @@
+tests/events.test.ts
+  ai_agent 11,14-18,86-89,168-169,189-192,279-282,334-336,370-375
+tests/manifest.test.ts
+  ai_agent 130-131,151-153,158-160
+src/bin/event.ts
+  ai_agent 9-10,12-15,38-41
+herdr-plugin.toml
+  ai_agent 18-24
+src/events.ts
+  ai_agent 10-16,62-64,103-106,132-134,139-143,178-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "73a10ffb8c05de097b61459e756f3706da65050b",
+  "prompts": {}
+}
