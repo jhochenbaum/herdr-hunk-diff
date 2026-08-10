@@ -1,0 +1,11 @@
+tests/operands.test.ts
+  ai_agent 126
+src/operands.ts
+  ai_agent 19-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "2ea8e378f34c54a0c8c004031af73924199bc7f6",
+  "prompts": {}
+}
