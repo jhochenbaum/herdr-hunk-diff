@@ -1,0 +1,23 @@
+src/context.ts
+  ai_agent 51-56
+src/index-store.ts
+  ai_agent 18
+tests/bin.test.ts
+  ai_agent 12-16
+tests/runtime.test.ts
+  ai_agent 66-68
+src/hunk.ts
+  ai_agent 118-119
+src/events.ts
+  ai_agent 152-153
+src/herdr.ts
+  ai_agent 47-48,86,119-121
+tests/context.test.ts
+  ai_agent 92-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "d72ffa35432ee274db98cf09d216972b93975435",
+  "prompts": {}
+}
