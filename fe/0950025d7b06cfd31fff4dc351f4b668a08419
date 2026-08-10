@@ -1,0 +1,13 @@
+src/runtime.ts
+  ai_agent 13
+tests/git.test.ts
+  ai_agent 2
+tests/runtime-review-modes.test.ts
+  ai_agent 309-315,317-318,321-322,325-326
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "fe0950025d7b06cfd31fff4dc351f4b668a08419",
+  "prompts": {}
+}
