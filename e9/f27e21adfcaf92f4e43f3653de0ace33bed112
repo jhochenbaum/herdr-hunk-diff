@@ -1,0 +1,11 @@
+tests/courier.test.ts
+  ai_agent 1-64
+src/courier.ts
+  ai_agent 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "e9f27e21adfcaf92f4e43f3653de0ace33bed112",
+  "prompts": {}
+}
