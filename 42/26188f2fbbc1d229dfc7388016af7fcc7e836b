@@ -1,0 +1,15 @@
+tests/manifest.test.ts
+  ai_agent 1-43
+tests/herdr.test.ts
+  ai_agent 1-49
+herdr-plugin.toml
+  ai_agent 1-89
+src/herdr.ts
+  ai_agent 1-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "4226188f2fbbc1d229dfc7388016af7fcc7e836b",
+  "prompts": {}
+}
