@@ -1,0 +1,13 @@
+tests/hunk.test.ts
+  ai_agent 1-79
+src/hunk.ts
+  ai_agent 1-136
+tests/fixtures/fake-hunk
+  ai_agent 1-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "1c103b72eaae487b066c85d52539adb244a3be08",
+  "prompts": {}
+}
