@@ -1,0 +1,9 @@
+tests/hunk.test.ts
+  ai_agent 79-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "ac7f8e280ca811c3f210cb4112e5a50b44f342d1",
+  "prompts": {}
+}
