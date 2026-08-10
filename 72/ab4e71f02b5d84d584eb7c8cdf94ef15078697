@@ -1,0 +1,23 @@
+tests/daemon.test.ts
+  ai_agent 96-111,114,116,119,122-123
+tests/roundtrip.test.ts
+  ai_agent 1-131
+README.md
+  ai_agent 35-58,87-88,111-115
+tests/notes.test.ts
+  ai_agent 2,60-100
+src/notes.ts
+  ai_agent 2,30-50,59-60
+skills/hunk-herdr-review/SKILL.md
+  ai_agent 3,8-9,11-13,15-17,19,21,24-27,30-31,33,35-39,41-42,44,47-48,51-52,54-60,62,64-71,73-74
+src/daemon.ts
+  ai_agent 58-69,72
+tests/skill.test.ts
+  ai_agent 1-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "72ab4e71f02b5d84d584eb7c8cdf94ef15078697",
+  "prompts": {}
+}
