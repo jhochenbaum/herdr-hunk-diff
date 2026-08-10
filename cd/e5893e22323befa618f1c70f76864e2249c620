@@ -1,0 +1,15 @@
+tests/context.test.ts
+  ai_agent 4-26,43-66,69-70,73-81,87,92-103,123,129
+tests/runtime-lazy-target.test.ts
+  ai_agent 31,52
+tests/bin.test.ts
+  ai_agent 12-19,23,27,33,40,60,78,97,121,196,223
+src/context.ts
+  ai_agent 5-10,12-18,38-56,65-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "cde5893e22323befa618f1c70f76864e2249c620",
+  "prompts": {}
+}
