@@ -1,0 +1,13 @@
+src/config.ts
+  ai_agent 15-16
+src/index-store.ts
+  ai_agent 72
+tests/index-store.test.ts
+  ai_agent 94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "02487e8f442d6971ee5b29a1dbbd6af6c6a50ffc",
+  "prompts": {}
+}
