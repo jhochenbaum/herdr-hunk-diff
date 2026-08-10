@@ -1,0 +1,19 @@
+vitest.config.ts
+  ai_agent 1-5
+package.json
+  ai_agent 1-21
+tests/config.test.ts
+  ai_agent 1-43
+src/config.ts
+  ai_agent 1-105
+package-lock.json
+  ai_agent 1-2912
+tsconfig.json
+  ai_agent 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "751089cd9104857c5bcd09503b2a86e7070c2718",
+  "prompts": {}
+}
