@@ -1,0 +1,11 @@
+src/runtime.ts
+  ai_agent 194-220,357-367
+tests/runtime-actions.test.ts
+  ai_agent 60-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "c081d1a74684c33d4436385c17b44bf83aaa501b",
+  "prompts": {}
+}
