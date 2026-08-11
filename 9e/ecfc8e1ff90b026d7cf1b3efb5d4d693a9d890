@@ -1,0 +1,15 @@
+src/keys.ts
+  ai_agent 1-2,52-63,65,67-75,77-83,86-91,93-99,101-102,104-111,113-117,119,123
+src/keys-install.ts
+  ai_agent 4-10,127-141
+tests/keys-install.test.ts
+  ai_agent 5,274-303
+tests/keys.test.ts
+  ai_agent 5,116-188,262-271
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "9eecfc8e1ff90b026d7cf1b3efb5d4d693a9d890",
+  "prompts": {}
+}
