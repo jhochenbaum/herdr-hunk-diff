@@ -1,0 +1,11 @@
+src/pager.ts
+  ai_agent 224-235,265-266,268-299
+tests/pager.test.ts
+  ai_agent 73-76,107,186,189,194,230,233,395-471
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "c37010726a28095b28332f555147a1d0de48c526",
+  "prompts": {}
+}
