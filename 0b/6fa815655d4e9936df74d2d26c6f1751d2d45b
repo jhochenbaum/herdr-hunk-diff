@@ -1,0 +1,9 @@
+tests/fixtures/fake-hunk
+  ai_agent 36-38,49-52,93,111-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "0b6fa815655d4e9936df74d2d26c6f1751d2d45b",
+  "prompts": {}
+}
