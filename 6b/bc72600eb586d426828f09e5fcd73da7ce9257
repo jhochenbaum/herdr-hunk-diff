@@ -1,0 +1,31 @@
+herdr-plugin.toml
+  ai_agent 5-7,9,11-17,19-22,37-39,41-42,59-60,62-65,97-98,115-118,168-169,184-188,191-193
+tests/main-guard.test.ts
+  ai_agent 10-11
+tests/config.test.ts
+  ai_agent 105-109,111
+tests/hunk.test.ts
+  ai_agent 58,398,534-535,589-592
+tests/manifest.test.ts
+  ai_agent 68-70,72,82-83,92-95,97
+tests/pager.test.ts
+  ai_agent 56-58,260,449-452
+tests/skill.test.ts
+  ai_agent 15-17
+tests/events.test.ts
+  ai_agent 11-12,14-16
+tests/courier.test.ts
+  ai_agent 83,85-88,156-157
+tests/keys-install.test.ts
+  ai_agent 35-37
+tests/context.test.ts
+  ai_agent 5-6,8-10,12-13,249-251
+tests/herdr.test.ts
+  ai_agent 81-82,119-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "6bbc72600eb586d426828f09e5fcd73da7ce9257",
+  "prompts": {}
+}
