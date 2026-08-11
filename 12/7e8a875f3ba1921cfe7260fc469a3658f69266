@@ -1,0 +1,15 @@
+README.md
+  ai_agent 140-142
+src/config.ts
+  ai_agent 7-11,74
+tests/config.test.ts
+  ai_agent 121,124,130,151-155,159-160
+tests/events.test.ts
+  ai_agent 222-225,234-237
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "127e8a875f3ba1921cfe7260fc469a3658f69266",
+  "prompts": {}
+}
