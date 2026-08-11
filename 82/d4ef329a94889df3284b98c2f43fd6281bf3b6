@@ -1,0 +1,55 @@
+herdr-plugin.toml
+  ai_agent 5,10,17-18,35,138,151
+src/courier.ts
+  ai_agent 4,30
+src/context.ts
+  ai_agent 7,9,12,19-21,26,42,56
+src/events.ts
+  ai_agent 7-8,26,35,40,61,77,88,133,144,165
+src/pager.ts
+  ai_agent 5,11,25,36,40,53,75-76,83,89,120-121,187,217,229,243,265
+src/target.ts
+  ai_agent 7,15,19,28,47
+tests/pane-index-invariant.test.ts
+  ai_agent 292,313
+src/herdr.ts
+  ai_agent 8,43,48,66,71,82
+src/hunk.ts
+  ai_agent 19-20,23,27,39,47,63,86,122,159,167,187
+src/keys-install.ts
+  ai_agent 16,18,23-24,48,68
+tests/runtime-actions.test.ts
+  ai_agent 282
+tests/runtime.test.ts
+  ai_agent 99,179
+src/index-store.ts
+  ai_agent 17,19,21,23,25,41,47-48,73,83,90-91,119,134,147,161-162,179
+src/bin/main-guard.ts
+  ai_agent 5-6,17
+src/runtime.ts
+  ai_agent 25,30,32,41,73,88,93-94,106,127,137,160,166,171,217,239,263,316
+src/config.ts
+  ai_agent 8,11,14,17,27,37,81,91
+src/actions.ts
+  ai_agent 3,18,21,37
+src/git.ts
+  ai_agent 12,20,25,51
+src/notes.ts
+  ai_agent 5,15,30
+tests/keys-install.test.ts
+  ai_agent 197,240
+src/keys.ts
+  ai_agent 13,48,65
+tests/pager.test.ts
+  ai_agent 12
+src/bin/event.ts
+  ai_agent 11
+src/bin/pane.ts
+  ai_agent 21,43,48,68,73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "82d4ef329a94889df3284b98c2f43fd6281bf3b6",
+  "prompts": {}
+}
