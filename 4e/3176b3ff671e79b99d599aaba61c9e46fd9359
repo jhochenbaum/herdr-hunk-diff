@@ -1,0 +1,19 @@
+src/config.ts
+  ai_agent 7,54
+tests/roundtrip.test.ts
+  ai_agent 65
+tests/pane-index-invariant.test.ts
+  ai_agent 297
+tests/events.test.ts
+  ai_agent 10,16,22-23,58,60,77,112,119,130,145,153,167,179,192,199,213,222,231,240,246,254,270,281,285,287,289,295-296,435,451,468,493
+tests/config.test.ts
+  ai_agent 148-153
+README.md
+  ai_agent 10,140-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "4e3176b3ff671e79b99d599aaba61c9e46fd9359",
+  "prompts": {}
+}
