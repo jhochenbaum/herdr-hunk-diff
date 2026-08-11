@@ -1,0 +1,13 @@
+tests/context.test.ts
+  ai_agent 6-12,81-84,89-182
+src/context.ts
+  ai_agent 1-2,19-35,58-70,94-103,120-128
+tests/target.test.ts
+  ai_agent 3,203-243
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "7c832c6b3ace2c8294a4c6c83a78045d4d6f3f8f",
+  "prompts": {}
+}
