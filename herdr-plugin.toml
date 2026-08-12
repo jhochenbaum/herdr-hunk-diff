@@ -1,0 +1,156 @@
+id = "jhochenbaum.hunkdiff"
+name = "hunk"
+version = "0.1.0"
+
+# Requires plugin-root-relative action commands and reliable agent prompt submission from Herdr 0.8.
+min_herdr_version = "0.8.0"
+description = "Review agent-authored diffs in hunk, and send your inline comments back to the agent that wrote them."
+platforms = ["macos", "linux"]
+
+# Remote installs fetch dependencies and compile; `plugin link` users build locally.
+[[build]]
+command = ["npm", "ci"]
+
+[[build]]
+command = ["npm", "run", "build"]
+
+# Global socket subscriptions require a pane id, so each event runs a short-lived manifest hook.
+# Hook cwd is unspecified; resolve the entrypoint from the plugin root.
+[[events]]
+on = "pane.agent_status_changed"
+command = ["sh", "-c", "exec node \"${HERDR_PLUGIN_ROOT:-.}/dist/bin/event.js\""]
+
+[[events]]
+on = "pane.exited"
+command = ["sh", "-c", "exec node \"${HERDR_PLUGIN_ROOT:-.}/dist/bin/event.js\""]
+
+[[events]]
+on = "pane.closed"
+command = ["sh", "-c", "exec node \"${HERDR_PLUGIN_ROOT:-.}/dist/bin/event.js\""]
+
+[[events]]
+on = "worktree.removed"
+command = ["sh", "-c", "exec node \"${HERDR_PLUGIN_ROOT:-.}/dist/bin/event.js\""]
+
+# The pane runs from the reviewed worktree. Its trailing action id carries mode across processes.
+[[panes]]
+id = "review"
+title = "hunk review"
+placement = "split"
+command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/pane.js\" review"]
+
+[[panes]]
+id = "review-staged"
+title = "hunk review (staged)"
+placement = "split"
+command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/pane.js\" review:staged"]
+
+[[panes]]
+id = "review-branch"
+title = "hunk review (branch)"
+placement = "split"
+command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/pane.js\" review:branch"]
+
+[[panes]]
+id = "review-commit"
+title = "hunk review (commit)"
+placement = "split"
+command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/pane.js\" review:commit"]
+
+[[panes]]
+id = "review-stash"
+title = "hunk review (stash)"
+placement = "split"
+command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/pane.js\" review:stash"]
+
+[[actions]]
+id = "review"
+title = "hunk: review changes"
+contexts = ["workspace", "pane"]
+command = ["node", "dist/bin/action.js", "review"]
+
+[[actions]]
+id = "review:staged"
+title = "hunk: review staged changes"
+contexts = ["workspace"]
+command = ["node", "dist/bin/action.js", "review:staged"]
+
+[[actions]]
+id = "review:branch"
+title = "hunk: review this branch against its base"
+contexts = ["workspace", "pane"]
+command = ["node", "dist/bin/action.js", "review:branch"]
+
+[[actions]]
+id = "review:commit"
+title = "hunk: review the last commit (or a clicked GitHub commit link)"
+contexts = ["workspace"]
+command = ["node", "dist/bin/action.js", "review:commit"]
+
+[[actions]]
+id = "send-review"
+title = "hunk: send review to agent"
+contexts = ["pane"]
+command = ["node", "dist/bin/action.js", "send-review"]
+
+[[actions]]
+id = "reload"
+title = "hunk: reload the open review"
+contexts = ["workspace", "pane"]
+command = ["node", "dist/bin/action.js", "reload"]
+
+[[actions]]
+id = "close-review"
+title = "hunk: close the review pane"
+contexts = ["pane", "workspace"]
+command = ["node", "dist/bin/action.js", "close-review"]
+
+[[actions]]
+id = "setup-keys"
+title = "hunk: install default keybindings"
+contexts = ["workspace"]
+command = ["node", "dist/bin/action.js", "setup-keys"]
+
+[[actions]]
+id = "remove-keys"
+title = "hunk: remove default keybindings"
+contexts = ["workspace"]
+command = ["node", "dist/bin/action.js", "remove-keys"]
+
+[[actions]]
+id = "review:stash"
+title = "hunk: review the most recent stash entry"
+contexts = ["workspace"]
+command = ["node", "dist/bin/action.js", "review:stash"]
+
+[[actions]]
+id = "next-comment"
+title = "hunk: go to the next review comment"
+contexts = ["pane", "workspace"]
+command = ["node", "dist/bin/action.js", "next-comment"]
+
+[[actions]]
+id = "prev-comment"
+title = "hunk: go to the previous review comment"
+contexts = ["pane", "workspace"]
+command = ["node", "dist/bin/action.js", "prev-comment"]
+
+# Git setup is automatic; jj and sl only expose interactive config editing, so actions give snippets.
+[[actions]]
+id = "install-pager"
+title = "hunk: set up hunk as your VCS pager (git automatically, jj and sl by hand)"
+contexts = ["workspace"]
+command = ["node", "dist/bin/action.js", "install-pager"]
+
+[[actions]]
+id = "uninstall-pager"
+title = "hunk: stop using hunk as your VCS pager"
+contexts = ["workspace"]
+command = ["node", "dist/bin/action.js", "uninstall-pager"]
+
+# Commit SHAs resolve locally; pull request numbers would require network access and authentication.
+[[link_handlers]]
+id = "github-commit"
+title = "hunk: review this GitHub commit"
+pattern = "^https://github\\.com/[^/]+/[^/]+/commit/[0-9a-fA-F]{7,40}/?$"
+action = "review:commit"

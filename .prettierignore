@@ -1,0 +1,6 @@
+dist/
+node_modules/
+package-lock.json
+tests/fixtures/fake-hunk
+.superpowers/
+docs/superpowers/

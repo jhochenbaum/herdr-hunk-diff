@@ -1,0 +1,51 @@
+{
+  "name": "herdr-hunk-diff",
+  "version": "0.1.0",
+  "description": "A herdr plugin that reviews agent-authored diffs in hunk and sends your inline comments back to the agent that wrote them.",
+  "license": "MIT",
+  "author": "Jordan Hochenbaum",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhochenbaum/herdr-hunk-diff.git"
+  },
+  "keywords": [
+    "herdr",
+    "herdr-plugin",
+    "hunk",
+    "diff",
+    "code-review",
+    "terminal"
+  ],
+  "//": "private: installs come from GitHub via `herdr plugin install`, never npm.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "npm run format:check && npm run lint",
+    "check:fix": "npm run lint:fix && npm run format",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "hunkdiff": "0.18.1",
+    "smol-toml": "^1.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.9.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.6.0",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^3.2.7"
+  }
+}
