@@ -1,0 +1,21 @@
+src/runtime.ts
+  ai_agent 11,34,68,117-124
+tests/git.test.ts
+  ai_agent 1,6-12,307-321
+src/git.ts
+  ai_agent 64-68
+src/bin/pane.ts
+  ai_agent 7,27-28,69-75
+tests/runtime-review-modes.test.ts
+  ai_agent 23,188-201
+tests/bin.test.ts
+  ai_agent 12-41
+tests/pane-index-invariant.test.ts
+  ai_agent 145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "5294984f8e21e0505e9b27e548990aafda2e0d4c",
+  "prompts": {}
+}
