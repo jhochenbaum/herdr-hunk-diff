@@ -1,0 +1,9 @@
+tests/runtime-lazy-target.test.ts
+  ai_agent 11,17,22,24-27,32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "a4c026f9909d4040632bab45e6f76154e27a6054",
+  "prompts": {}
+}
