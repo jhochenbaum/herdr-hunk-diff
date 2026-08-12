@@ -1,0 +1,17 @@
+README.md
+  ai_agent 12
+package-lock.json
+  ai_agent 27,31-33,48-50,65-67,82-84,99-101,116-118,133-135,150-152,167-169,184-186,201-203,218-220,235-237,252-254,269-271,286-288,303-305,320-322,337-339,354-356,371-373,388-390,405-407,422-424,439-441,456-458,2363-2365,2376-2401,3983-3985,3989-3994,4000,4009,4011,4013-4016
+tests/context.test.ts
+  ai_agent 7,13,40
+.github/workflows/ci.yml
+  ai_agent 21
+package.json
+  ai_agent 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "878cceb815e82c35afb094e5498b0224c586e771",
+  "prompts": {}
+}
