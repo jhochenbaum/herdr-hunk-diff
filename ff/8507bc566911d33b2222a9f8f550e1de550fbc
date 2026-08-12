@@ -1,0 +1,9 @@
+README.md
+  ai_agent 177-193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "ff8507bc566911d33b2222a9f8f550e1de550fbc",
+  "prompts": {}
+}
