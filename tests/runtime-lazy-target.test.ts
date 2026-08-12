@@ -8,32 +8,28 @@ import { buildRuntime, dispatch } from "../src/runtime.js";
 describe("buildRuntime target laziness", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it("setup-keys succeeds and never shells out to git when the resolved cwd is not a git repository", async () => {
     const fakeHome = mkdtempSync(join(tmpdir(), "hunkdiff-home-"));
     mkdirSync(join(fakeHome, ".config", "herdr"), { recursive: true });
+    const configPath = join(fakeHome, ".config", "herdr", "config.toml");
 
     const nonGitCwd = mkdtempSync(join(tmpdir(), "hunkdiff-nogit-"));
 
-    const originalHome = process.env.HOME;
     const runnerSpy = vi.spyOn(git, "realRunner");
+    vi.stubEnv("HERDR_CONFIG_PATH", configPath);
 
-    let code: number;
-    try {
-      process.env.HOME = fakeHome;
-      const rt = buildRuntime({
-        HERDR_PLUGIN_CONTEXT_JSON: JSON.stringify({ focused_pane_cwd: nonGitCwd }),
-      });
-      code = await dispatch("setup-keys", rt);
-    } finally {
-      process.env.HOME = originalHome;
-    }
+    const rt = buildRuntime({
+      HERDR_PLUGIN_CONTEXT_JSON: JSON.stringify({ focused_pane_cwd: nonGitCwd }),
+    });
+    const code = await dispatch("setup-keys", rt);
 
     expect(code).toBe(0);
     expect(runnerSpy).not.toHaveBeenCalled();
 
-    const installed = readFileSync(join(fakeHome, ".config", "herdr", "config.toml"), "utf8");
+    const installed = readFileSync(configPath, "utf8");
     expect(installed).toContain("prefix+shift+h");
   });
 
