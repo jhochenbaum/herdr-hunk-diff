@@ -30,6 +30,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix --max-warnings 0",
+    "sync:hunk-version": "node scripts/sync-verified-hunk-version.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
