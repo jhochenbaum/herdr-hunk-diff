@@ -34,10 +34,10 @@ https://github.com/user-attachments/assets/a36991a9-288f-4c8a-845c-ce2399334b9b
 
 ## Requirements
 
-| Name | Version |
-| --- | --- |
+| Name      | Version                          |
+| --------- | -------------------------------- |
 | **herdr** | 0.8.0 or newer on macOS or Linux |
-| **Node** | 22.12 or newer |
+| **Node**  | 22.12 or newer                   |
 
 The plugin installs its pinned `hunkdiff` dependency automatically. You do not need a global hunk
 installation for reviews opened inside herdr.
@@ -140,22 +140,22 @@ herdr server reload-config
 | `review`        | Configured `default_target`; `auto` selects the branch diff when ahead of base, otherwise the working tree |
 | `review:staged` | Staged changes with `hunk diff --staged`                                                                   |
 | `review:branch` | `<base>...HEAD`; falls back to the working tree with a warning when no base can be resolved                |
-| `review:commit` | The latest commit, or a locally available commit from a Ctrl-clicked GitHub commit URL                      |
+| `review:commit` | The latest commit, or a locally available commit from a Ctrl-clicked GitHub commit URL                     |
 | `review:stash`  | The most recent stash entry                                                                                |
 
 **Everything else**
 
 | Action            | Effect                                                    |
 | ----------------- | --------------------------------------------------------- |
-| `send-review`     | Send all unsent inline comments to the associated agent    |
-| `reload`          | Reload the target shown in the current review pane         |
-| `close-review`    | Close the review pane for the current worktree             |
-| `next-comment`    | Move hunk to the next annotated hunk                       |
-| `prev-comment`    | Move hunk to the previous annotated hunk                   |
-| `setup-keys`      | Install the default herdr keybindings                      |
-| `remove-keys`     | Remove only the keybinding block installed by this plugin  |
-| `install-pager`   | Configure supported VCS pagers                             |
-| `uninstall-pager` | Remove pager configuration owned by this plugin             |
+| `send-review`     | Send all unsent inline comments to the associated agent   |
+| `reload`          | Reload the target shown in the current review pane        |
+| `close-review`    | Close the review pane for the current worktree            |
+| `next-comment`    | Move hunk to the next annotated hunk                      |
+| `prev-comment`    | Move hunk to the previous annotated hunk                  |
+| `setup-keys`      | Install the default herdr keybindings                     |
+| `remove-keys`     | Remove only the keybinding block installed by this plugin |
+| `install-pager`   | Configure supported VCS pagers                            |
+| `uninstall-pager` | Remove pager configuration owned by this plugin           |
 
 Invoke any action from the CLI with:
 
@@ -228,20 +228,20 @@ extra_args   = []
 | -------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `review.auto_open`         | `true` / `false`                                | Opens or refreshes a review when an associated agent enters a configured state.                                            |
 | `review.on_states`         | List of `idle`, `working`, `blocked`, `unknown` | Selects the Herdr agent states that trigger automatic opening. An empty list disables all triggers.                        |
-| `review.reuse_pane`        | `true` / `false`                                | Refreshes the worktree's existing review pane when possible instead of opening another pane.                                |
+| `review.reuse_pane`        | `true` / `false`                                | Refreshes the worktree's existing review pane when possible instead of opening another pane.                               |
 | `review.default_target`    | `auto`, `working`, `staged`, `branch`           | Chooses what the `review` action shows. `auto` uses the branch diff when ahead of its base and the working tree otherwise. |
-| `review.watch`             | `true` / `false`                                | Passes `--watch` to Hunk so an open review refreshes as its underlying source changes.                                      |
+| `review.watch`             | `true` / `false`                                | Passes `--watch` to Hunk so an open review refreshes as its underlying source changes.                                     |
 | `review.placement`         | `overlay`, `split`, `tab`, `zoomed`             | Chooses where Herdr opens review panes: over the active pane, beside it, in a new tab, or as a zoomed pane.                |
-| `review.exclude_untracked` | `true` / `false`                                | Hides untracked files from working-tree, staged, and branch reviews.                                                        |
+| `review.exclude_untracked` | `true` / `false`                                | Hides untracked files from working-tree, staged, and branch reviews.                                                       |
 
 </details>
 
 <details>
 <summary><b><code>[roundtrip]</code></b> — sending comments back to the agent</summary>
 
-| Setting                      | Accepted values  | Effect                                                                                                                  |
-| ---------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `roundtrip.clear_after_send` | `true` / `false` | Removes comments from Hunk after successful delivery. With `false`, they remain visible but are still recorded as sent.  |
+| Setting                      | Accepted values  | Effect                                                                                                                    |
+| ---------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `roundtrip.clear_after_send` | `true` / `false` | Removes comments from Hunk after successful delivery. With `false`, they remain visible but are still recorded as sent.   |
 | `roundtrip.prompt_template`  | String           | Controls the prompt sent to the agent. Supported placeholders are listed under [Round-trip prompts](#round-trip-prompts). |
 
 </details>
@@ -252,7 +252,7 @@ extra_args   = []
 | Setting             | Accepted values            | Effect                                                                                                                           |
 | ------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `hunk.bin`          | `auto` or an absolute path | Uses the bundled Hunk executable or a specific external executable.                                                              |
-| `hunk.experimental` | `true` / `false`           | Passes Hunk's `--experimental` option, currently including support for STML-rendered agent notes.                                 |
+| `hunk.experimental` | `true` / `false`           | Passes Hunk's `--experimental` option, currently including support for STML-rendered agent notes.                                |
 | `hunk.extra_args`   | List of strings            | Appends advanced arguments verbatim to each new Hunk launch. Invalid or conflicting arguments can prevent a review from opening. |
 
 </details>
