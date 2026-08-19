@@ -1,0 +1,9 @@
+tests/pane-index-invariant.test.ts
+  32855b1c1ea65a8a 17,61-64,75,212,248,339
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "357036e1bc0508295cfca23addfd11b02c780f87",
+  "prompts": {}
+}
