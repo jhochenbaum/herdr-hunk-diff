@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import type { ResolvedTargetMode } from "./config.js";
+import { worktreeKey } from "./worktree.js";
 
 export interface ReviewEntry {
   worktree: string;
@@ -44,8 +45,9 @@ function sleep(ms: number): void {
 }
 
 /**
- * Cross-process review state. Mutations lock and reread the file; writes use an atomic rename so
- * concurrent readers never observe partial JSON.
+ * Cross-process review state, keyed by `worktreeKey` so the same repository resolves to one entry
+ * whichever spelling of its path a caller happens to hold. Mutations lock and reread the file;
+ * writes use an atomic rename so concurrent readers never observe partial JSON.
  */
 export class ReviewIndex {
   private readonly file: string;
@@ -150,7 +152,7 @@ export class ReviewIndex {
   }
 
   get(worktree: string): ReviewEntry | undefined {
-    return this.read()[worktree];
+    return this.read()[worktreeKey(worktree)];
   }
 
   all(): ReviewEntry[] {
@@ -171,7 +173,8 @@ export class ReviewIndex {
    */
   upsert(entry: ReviewEntry): void {
     this.mutate((entries) => {
-      const existing = entries[entry.worktree];
+      const key = worktreeKey(entry.worktree);
+      const existing = entries[key];
       const merged: Record<string, unknown> = { ...existing };
       for (const [key, value] of Object.entries(entry)) {
         if (value === undefined) continue;
@@ -180,14 +183,14 @@ export class ReviewIndex {
       }
       merged.sent = ReviewIndex.ids([...(existing?.sent ?? []), ...(entry.sent ?? [])]);
       merged.worktree = entry.worktree;
-      entries[entry.worktree] = merged as unknown as ReviewEntry;
+      entries[key] = merged as unknown as ReviewEntry;
     });
   }
 
   /** Clears the displayed pane while preserving agent and delivery history. */
   clearPane(worktree: string): void {
     this.mutate((entries) => {
-      const entry = entries[worktree];
+      const entry = entries[worktreeKey(worktree)];
       if (!entry) return;
       delete entry.paneId;
     });
@@ -195,19 +198,20 @@ export class ReviewIndex {
 
   markSent(worktree: string, ids: string[]): void {
     this.mutate((entries) => {
-      const entry = entries[worktree] ?? { worktree, sent: [] };
+      const key = worktreeKey(worktree);
+      const entry = entries[key] ?? { worktree, sent: [] };
       entry.sent = ReviewIndex.ids([...(entry.sent ?? []), ...ids]);
-      entries[worktree] = entry;
+      entries[key] = entry;
     });
   }
 
   sentIds(worktree: string): string[] {
-    return ReviewIndex.ids(this.read()[worktree]?.sent);
+    return ReviewIndex.ids(this.read()[worktreeKey(worktree)]?.sent);
   }
 
   remove(worktree: string): void {
     this.mutate((entries) => {
-      delete entries[worktree];
+      delete entries[worktreeKey(worktree)];
     });
   }
 }

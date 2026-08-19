@@ -11,6 +11,34 @@ describe("ReviewIndex", () => {
     expect(new ReviewIndex(dir()).get("/wt/x")).toBeUndefined();
   });
 
+  // One repository is one entry however its path is spelled. The paths reaching the index come from
+  // herdr's context, `git rev-parse` and a process cwd, which disagree on Windows; keying on the raw
+  // string would give one repository several entries, and a review would miss its own state.
+  it("finds an entry through another spelling of the same path", () => {
+    const d = dir();
+    new ReviewIndex(d).upsert({ worktree: "/wt/x", agentName: "reviewer", sent: [] });
+    expect(new ReviewIndex(d).get("/wt/x/")?.agentName).toBe("reviewer");
+  });
+
+  it("merges into the existing entry rather than adding a second one", () => {
+    const d = dir();
+    const index = new ReviewIndex(d);
+    index.upsert({ worktree: "/wt/x", agentName: "reviewer", sent: ["a"] });
+    index.upsert({ worktree: "/wt/x/", paneId: "w1:p2", sent: ["b"] });
+
+    expect(index.all()).toHaveLength(1);
+    expect(index.get("/wt/x")).toMatchObject({ agentName: "reviewer", paneId: "w1:p2" });
+    expect(index.sentIds("/wt/x")).toEqual(["a", "b"]);
+  });
+
+  it("removes an entry addressed by another spelling of its path", () => {
+    const d = dir();
+    const index = new ReviewIndex(d);
+    index.upsert({ worktree: "/wt/x", sent: [] });
+    index.remove("/wt/x/");
+    expect(index.get("/wt/x")).toBeUndefined();
+  });
+
   it("persists an entry across instances", () => {
     const d = dir();
     new ReviewIndex(d).upsert({ worktree: "/wt/x", agentName: "reviewer", sent: [] });
