@@ -83,8 +83,6 @@ describe("paneEntrypointFor", () => {
     expect(new Set(entrypoints).size).toBe(entrypoints.length);
   });
 
-  // The Windows twins exist because a pane command needs a shell to reach the plugin root, and the
-  // two platforms do not share one. Opening the POSIX id on Windows launches nothing.
   it("selects the windows twin of each entrypoint on win32", () => {
     expect(REVIEW_ACTIONS.map((id) => paneEntrypointFor(id, "win32"))).toEqual([
       "review-windows",

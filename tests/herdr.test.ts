@@ -15,9 +15,6 @@ describe("resolveHunkLauncher", () => {
     expect(resolveHunkLauncher(DEFAULTS, "/plugin").bin).toBe(process.execPath);
   });
 
-  // npm writes `node_modules/.bin/hunk` as a symlink on POSIX but as `hunk.cmd` on Windows, and
-  // Node refuses to spawn a batch file without a shell. Reaching past the shim to the launcher it
-  // wraps keeps one spawn path working on every platform.
   it("never reaches for the node_modules/.bin shim", () => {
     const { bin, prefix } = resolveHunkLauncher(DEFAULTS, "/plugin");
     expect([bin, ...prefix].join(" ")).not.toContain(".bin");

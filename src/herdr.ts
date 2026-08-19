@@ -20,18 +20,13 @@ export function reportFailure(herdr: { notify: (message: string) => void }, mess
   return 1;
 }
 
-/** How to spawn hunk: an executable, plus any arguments that precede hunk's own argv. */
+/** Executable and arguments prepended to hunk's argv. */
 export interface HunkLauncher {
   bin: string;
   prefix: string[];
 }
 
-/**
- * The bundled hunk is a Node launcher (`hunk.cjs`) that execs a prebuilt binary, and
- * `node_modules/.bin/hunk` is only a shim over it: a symlink on POSIX, but `hunk.cmd` on Windows,
- * which Node refuses to spawn without a shell. Running the launcher under this process's own Node
- * skips the shim on every platform, so no code path depends on how npm chose to wrap it.
- */
+/** Runs the bundled launcher with Node, bypassing platform-specific npm shims. */
 export function resolveHunkLauncher(
   cfg: PluginConfig,
   pluginRoot: string,

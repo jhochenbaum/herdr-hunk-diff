@@ -54,10 +54,6 @@ function onDisk(dir: string): Record<string, ReviewEntry> {
   }
 }
 
-/**
- * The index file is keyed by `worktreeKey`, not by the path a caller holds, so a snapshot taken at
- * spawn time has to be read the same way the store writes it.
- */
 function entryAt(index: Record<string, ReviewEntry>, worktree: string): ReviewEntry | undefined {
   return index[worktreeKey(worktree)];
 }

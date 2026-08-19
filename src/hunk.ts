@@ -119,11 +119,10 @@ export function canReload(mode: Target["mode"]): boolean {
 export class HunkAdapter {
   constructor(
     private readonly bin: string,
-    /** Precedes hunk's own argv, so the bundled launcher can run under a chosen Node. */
     private readonly prefix: string[] = [],
   ) {}
 
-  /** Names the whole command, since `bin` alone may be a Node that says nothing about hunk. */
+  /** Full command used in launch errors. */
   private get command(): string {
     return [this.bin, ...this.prefix].join(" ");
   }

@@ -13,8 +13,7 @@ import {
   parseHunkComments,
 } from "../src/hunk.js";
 
-// The fixture is a Node script run under this process's own Node, mirroring how the real bundled
-// hunk is launched — and unlike a shebang script, that works on Windows too.
+// Run the fixture under Node, matching the bundled launcher on every platform.
 const FAKE = fileURLToPath(new URL("./fixtures/fake-hunk.js", import.meta.url));
 const fakeHunk = () => new HunkAdapter(process.execPath, [FAKE]);
 const hunk = fakeHunk();
@@ -519,8 +518,6 @@ describe("HunkAdapter", () => {
     });
   });
 
-  // With the bundled launcher the spawned executable is a Node, so reporting `bin` alone would name
-  // a working interpreter and say nothing about which hunk failed to run.
   it("names the launcher script in the missing-binary message, not just the interpreter", async () => {
     const missing = new HunkAdapter("/nonexistent/node", ["/plugin/hunkdiff/bin/hunk.cjs"]);
     await expect(missing.getSession("/wt/x")).rejects.toMatchObject({

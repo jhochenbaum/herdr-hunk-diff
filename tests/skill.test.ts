@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { parse } from "smol-toml";
 
-// Read with line endings normalized: .gitattributes checks the repo out as LF, but a working tree
-// created before that did may hold CRLF, and every assertion below is about content, not newlines.
 const SKILL = readFileSync("skills/hunk-herdr-review/SKILL.md", "utf8").replaceAll("\r\n", "\n");
 const manifest = parse(readFileSync("herdr-plugin.toml", "utf8")) as any;
 const PLUGIN_ID = manifest.id as string;

@@ -99,9 +99,6 @@ describe("sidecarPath", () => {
     expect(sidecarPath(d, "/wt/a")).not.toBe(sidecarPath(d, "/wt/b"));
   });
 
-  // The action process writes the sidecar and the pane process reads it, each holding a path from a
-  // different source. Hashing the raw string would have them address different files, and the notes
-  // an agent wrote would never reach the review that was opened for them.
   it("addresses one file for either spelling of the same worktree", () => {
     const d = dir();
     expect(sidecarPath(d, "/wt/a/")).toBe(sidecarPath(d, "/wt/a"));

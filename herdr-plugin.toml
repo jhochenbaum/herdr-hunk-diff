@@ -7,9 +7,7 @@ min_herdr_version = "0.8.0"
 description = "Review agent-authored diffs in hunk, and send your inline comments back to the agent that wrote them."
 platforms = ["macos", "linux", "windows"]
 
-# Remote installs fetch dependencies and compile; `plugin link` users build locally. These inherit
-# the platforms declared above, so omitting Windows there would skip the build on Windows and leave
-# a plugin with no `dist/` for herdr to run.
+# Build steps inherit the top-level platforms.
 [[build]]
 command = ["npm", "ci"]
 

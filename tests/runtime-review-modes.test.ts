@@ -288,7 +288,6 @@ describe("what the pane process reads from the index at launch", () => {
     });
     expect(await dispatch("review:commit", rt as any)).toBe(0);
     expect(observed).toHaveLength(1);
-    // The index file is keyed by worktree identity, not by the path spelling a caller holds.
     expect(observed[0][worktreeKey("/wt/x")]?.requestedRef).toBe("abc1234def");
   });
 

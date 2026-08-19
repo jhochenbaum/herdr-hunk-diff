@@ -470,11 +470,7 @@ describe("setup-keys reporting", () => {
     return fakeHome;
   }
 
-  /**
-   * The default config location differs by platform, and so does the variable that redirects it:
-   * `homedir()` ignores HOME on Windows, where herdr reads `%APPDATA%`. Redirecting the wrong one
-   * does not fail — it lets these tests install keybindings into the real user config.
-   */
+  // Keep default-location tests out of the real user profile.
   const WINDOWS = process.platform === "win32";
   const CONFIG_ENV = ["HOME", "APPDATA", "HERDR_CONFIG_PATH", "XDG_CONFIG_HOME"] as const;
 

@@ -43,11 +43,7 @@ const PANE_ENTRYPOINTS: Record<string, string> = {
   "review:stash": "review-stash",
 };
 
-/**
- * Suffix of the Windows twin of each pane. A pane command cannot reach the plugin root without a
- * shell to expand it, herdr expands nothing itself, and one pane id cannot carry two commands, so
- * every mode declares a `sh` entry and a `cmd` entry under distinct ids.
- */
+/** Selects the cmd-based manifest entry for a Windows pane. */
 export const WINDOWS_PANE_SUFFIX = "-windows";
 
 export function paneEntrypointFor(

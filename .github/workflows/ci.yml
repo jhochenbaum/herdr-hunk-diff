@@ -21,9 +21,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         node: ["22.12", "24"]
-        # The manifest claims Windows support, so the suite runs there to keep that a tested claim:
-        # path handling, PATH probing and the config location all differ, and each fails quietly.
-        # One Node version is enough, since what differs on Windows is the OS, not V8.
+        # One Windows job covers OS-specific behavior.
         include:
           - os: windows-latest
             node: "24"
@@ -45,7 +43,6 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
         run: npm audit --audit-level=high
 
-      # Formatting and lint are platform-independent, so one platform is enough to enforce them.
       - name: Check formatting and lint
         if: matrix.os == 'ubuntu-latest'
         run: npm run check

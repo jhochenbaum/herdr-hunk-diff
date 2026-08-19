@@ -44,8 +44,6 @@ describe("dispatch", () => {
     });
   });
 
-  // Asserted through paneEntrypointFor rather than a literal, because the entrypoint is
-  // platform-dependent: Windows opens the `cmd` twin of each pane, under its own id.
   it.each(["review", "review:staged", "review:branch", "review:commit", "review:stash"] as const)(
     "opens the %s action's own pane entrypoint",
     async (actionId) => {

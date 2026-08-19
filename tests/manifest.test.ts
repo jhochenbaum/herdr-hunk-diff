@@ -21,8 +21,6 @@ describe("herdr-plugin.toml", () => {
     expect(manifest.platforms.sort()).toEqual(["linux", "macos", "windows"]);
   });
 
-  // Build steps inherit the top-level platforms, so a platform missing from a build step is a
-  // platform that installs the plugin with no `dist/` for herdr to run.
   it("builds on every platform it claims", () => {
     for (const step of manifest.build) {
       expect(step.platforms ?? manifest.platforms).toEqual(manifest.platforms);
@@ -115,8 +113,6 @@ describe("herdr-plugin.toml", () => {
   describe("review pane entrypoints", () => {
     const supported = [...REVIEW_ACTIONS] as ReviewActionId[];
 
-    // Every mode needs a POSIX pane and a Windows pane, so assert against both resolutions rather
-    // than whichever platform happens to run the suite.
     const platforms: NodeJS.Platform[] = ["darwin", "linux", "win32"];
     const entrypoints = () =>
       platforms.flatMap((platform) => supported.map((id) => paneEntrypointFor(id, platform)));
@@ -148,8 +144,6 @@ describe("herdr-plugin.toml", () => {
       );
     });
 
-    // A pane herdr will not launch is worse than a missing one: the split flashes and dies before
-    // pane.js can report anything, so the shell each entry needs must match the platform it claims.
     it("pairs each pane's declared platforms with a shell those platforms have", () => {
       for (const pane of manifest.panes) {
         const windows = pane.id.endsWith(WINDOWS_PANE_SUFFIX);

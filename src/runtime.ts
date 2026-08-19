@@ -85,8 +85,6 @@ async function reportReviewMetadata(rt: Runtime, target: Target): Promise<void> 
   ).length;
   try {
     rt.herdr.reportMetadata(entry.paneId, {
-      // basename, not a split on "/": a Windows worktree is backslash-separated, and splitting
-      // would title the pane with the entire path.
       title: `Review: ${basename(target.worktree)}`,
       display_agent: unsentCount > 0 ? `hunk (${unsentCount} unsent)` : "hunk",
     });

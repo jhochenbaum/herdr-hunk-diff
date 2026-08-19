@@ -1,4 +1,1 @@
-# Check every text file out with LF, on every platform. Git for Windows would otherwise convert to
-# CRLF, which prettier (endOfLine: lf) rejects and which breaks anything matching on "\n" — the
-# SKILL.md code-block assertions did exactly that on a Windows runner.
 * text=auto eol=lf

@@ -8,11 +8,7 @@ import { ReviewIndex } from "../src/index-store.js";
 import { sidecarPath, writeNotesSidecar } from "../src/notes.js";
 import type { Runtime } from "../src/runtime.js";
 
-/**
- * hunk is spawned as `node <bundled launcher> …`, never as the `node_modules/.bin` shim, so the
- * argv a test cares about starts after that prefix. Asserting the prefix here keeps every caller
- * from having to know about it, and fails loudly if the launcher stops being used.
- */
+/** Strips the Node launcher prefix before asserting hunk's argv. */
 function hunkArgs(call: [string, string[], ...unknown[]]): string[] {
   const [bin, args] = call;
   expect(bin).toBe(process.execPath);
