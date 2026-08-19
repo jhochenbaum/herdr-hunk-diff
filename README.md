@@ -34,13 +34,17 @@ https://github.com/user-attachments/assets/a36991a9-288f-4c8a-845c-ce2399334b9b
 
 ## Requirements
 
-| Name      | Version                          |
-| --------- | -------------------------------- |
-| **herdr** | 0.8.0 or newer on macOS or Linux |
-| **Node**  | 22.12 or newer                   |
+| Name      | Version                                   |
+| --------- | ----------------------------------------- |
+| **herdr** | 0.8.0 or newer on macOS, Linux or Windows |
+| **Node**  | 22.12 or newer                            |
 
 The plugin installs its pinned `hunkdiff` dependency automatically. You do not need a global hunk
 installation for reviews opened inside herdr.
+
+On Windows, hunk ships prebuilt binaries for x64 only, so reviews cannot open on Windows on ARM
+unless `[hunk].bin` points at a hunk you built yourself. Everything else — actions, keybindings and
+the pager setup — behaves the same on all three platforms.
 
 ## Quick start
 

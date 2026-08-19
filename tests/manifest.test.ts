@@ -17,8 +17,16 @@ describe("herdr-plugin.toml", () => {
     expect(manifest.min_herdr_version).toBe("0.8.0");
   });
 
-  it("targets macos and linux for v1", () => {
-    expect(manifest.platforms.sort()).toEqual(["linux", "macos"]);
+  it("targets macos, linux and windows", () => {
+    expect(manifest.platforms.sort()).toEqual(["linux", "macos", "windows"]);
+  });
+
+  // Build steps inherit the top-level platforms, so a platform missing from a build step is a
+  // platform that installs the plugin with no `dist/` for herdr to run.
+  it("builds on every platform it claims", () => {
+    for (const step of manifest.build) {
+      expect(step.platforms ?? manifest.platforms).toEqual(manifest.platforms);
+    }
   });
 
   it("uses no dots in action ids", () => {

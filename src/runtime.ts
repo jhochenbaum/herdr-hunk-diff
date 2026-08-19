@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { basename } from "node:path";
 import { loadConfig, type PluginConfig, type TargetMode } from "./config.js";
 import { readContext, type HerdrContext } from "./context.js";
 import { HerdrAdapter, reportFailure, resolveHunkLauncher } from "./herdr.js";
@@ -84,7 +85,9 @@ async function reportReviewMetadata(rt: Runtime, target: Target): Promise<void> 
   ).length;
   try {
     rt.herdr.reportMetadata(entry.paneId, {
-      title: `Review: ${target.worktree.split("/").pop()}`,
+      // basename, not a split on "/": a Windows worktree is backslash-separated, and splitting
+      // would title the pane with the entire path.
+      title: `Review: ${basename(target.worktree)}`,
       display_agent: unsentCount > 0 ? `hunk (${unsentCount} unsent)` : "hunk",
     });
   } catch {

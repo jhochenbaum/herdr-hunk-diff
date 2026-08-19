@@ -14,12 +14,19 @@ concurrency:
 
 jobs:
   test:
-    name: Node ${{ matrix.node }}
-    runs-on: ubuntu-latest
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         node: ["22.12", "24"]
+        # The manifest claims Windows support, so the suite runs there to keep that a tested claim:
+        # path handling, PATH probing and the config location all differ, and each fails quietly.
+        # One Node version is enough, since what differs on Windows is the OS, not V8.
+        include:
+          - os: windows-latest
+            node: "24"
 
     steps:
       - name: Check out repository
@@ -35,10 +42,13 @@ jobs:
         run: npm ci
 
       - name: Audit dependencies
-        if: matrix.node == '24'
+        if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
         run: npm audit --audit-level=high
 
+      # Formatting and lint are platform-independent, and a Windows checkout may carry CRLF line
+      # endings that prettier would reject for reasons that have nothing to do with the code.
       - name: Check formatting and lint
+        if: matrix.os == 'ubuntu-latest'
         run: npm run check
 
       - name: Build
