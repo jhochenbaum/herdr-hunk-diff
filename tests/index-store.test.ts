@@ -12,9 +12,45 @@ describe("ReviewIndex", () => {
     expect(new ReviewIndex(dir()).get("/wt/x")).toBeUndefined();
   });
 
-  // One repository is one entry however its path is spelled. The paths reaching the index come from
-  // herdr's context, `git rev-parse` and a process cwd, which disagree on Windows; keying on the raw
-  // string would give one repository several entries, and a review would miss its own state.
+  describe("Windows worktree identity", () => {
+    it("recovers a unique stored alias after the worktree disappears", () => {
+      let exists = true;
+      const realpath = () => {
+        if (!exists) throw new Error("ENOENT");
+        return "C:\\work\\Repo";
+      };
+      const index = new ReviewIndex(dir(), { platform: "win32", realpath });
+      index.upsert({ worktree: "C:\\WORK\\REPO", agentName: "reviewer", sent: ["c1"] });
+
+      exists = false;
+      expect(index.get("c:\\work\\repo")?.agentName).toBe("reviewer");
+      expect(index.sentIds("c:\\work\\repo")).toEqual(["c1"]);
+      index.remove("c:\\work\\repo");
+      expect(index.all()).toEqual([]);
+    });
+
+    it("does not guess between case-distinct repositories when a missing alias is ambiguous", () => {
+      let exists = true;
+      const realpath = (path: string) => {
+        if (!exists) throw new Error("ENOENT");
+        return path;
+      };
+      const index = new ReviewIndex(dir(), { platform: "win32", realpath });
+      index.upsert({ worktree: "C:\\work\\Repo", agentName: "upper", sent: [] });
+      index.upsert({ worktree: "C:\\work\\repo", agentName: "lower", sent: [] });
+
+      exists = false;
+      expect(index.get("C:\\work\\REPO")).toBeUndefined();
+      index.remove("C:\\work\\REPO");
+      expect(
+        index
+          .all()
+          .map((entry) => entry.agentName)
+          .sort(),
+      ).toEqual(["lower", "upper"]);
+    });
+  });
+
   it("finds an entry through another spelling of the same path", () => {
     const d = dir();
     new ReviewIndex(d).upsert({ worktree: "/wt/x", agentName: "reviewer", sent: [] });
@@ -72,7 +108,6 @@ describe("ReviewIndex", () => {
     const d = dir();
     writeFileSync(
       join(d, "review-index.json"),
-      // Keyed the way the store writes it: entries are addressed by worktree identity.
       JSON.stringify({ [worktreeKey("/wt/x")]: { worktree: "/wt/x", sent: [null, "c1"] } }),
     );
     const idx = new ReviewIndex(d);

@@ -40,13 +40,16 @@ export interface PagerEffects {
   canRun: (nameOrPath: string) => boolean;
 }
 
-/**
- * Path semantics of the platform being asked about, rather than the one this process runs on:
- * separators, PATH delimiter and drive letters all differ, and every function here takes an
- * explicit platform so its behaviour can be asserted from either host.
- */
+/** Target-platform path semantics, also used by host-independent tests. */
 function pathFor(platform: NodeJS.Platform): typeof posix {
   return platform === "win32" ? win32 : posix;
+}
+
+function executableExtensions(pathExt: string | undefined): string[] {
+  return (pathExt ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .map((ext) => ext.trim().toLowerCase())
+    .filter((ext) => ext.startsWith("."));
 }
 
 /** A value naming a location on disk rather than a command to look up on PATH. */
@@ -57,24 +60,16 @@ export function looksLikePath(
   return value.includes("/") || (platform === "win32" && value.includes("\\"));
 }
 
-/**
- * Names a bare command can have on disk. Windows has no executable bit: a command is executable
- * because of its extension, and `git` on PATH is `git.exe`, so searching for the bare name finds
- * nothing at all. PATHEXT lists the extensions the OS will try, with a documented default for the
- * rare environment that does not set it.
- */
+/** Expands Windows commands using PATHEXT; POSIX names pass through unchanged. */
 export function executableNames(
   name: string,
   pathExt: string | undefined,
   platform: NodeJS.Platform = process.platform,
 ): string[] {
-  if (platform !== "win32" || pathFor(platform).extname(name) !== "") return [name];
-  const extensions = (pathExt ?? ".COM;.EXE;.BAT;.CMD")
-    .split(";")
-    .map((ext) => ext.trim().toLowerCase())
-    .filter((ext) => ext.startsWith("."));
-  // PATHEXT is conventionally uppercase and Windows compares filenames case-insensitively, so the
-  // case here is cosmetic — lowercase keeps the candidate paths readable where they get reported.
+  if (platform !== "win32") return [name];
+  const extensions = executableExtensions(pathExt);
+  const suppliedExtension = win32.extname(name).toLowerCase();
+  if (suppliedExtension !== "") return extensions.includes(suppliedExtension) ? [name] : [];
   return extensions.map((ext) => `${name}${ext}`);
 }
 
@@ -95,26 +90,31 @@ export function onPath(
     .some((dir) => candidates.some((candidate) => isExecutable(joinFor(dir, candidate))));
 }
 
-/**
- * Real effects require an executable file; `X_OK` alone also accepts directories. On Windows the
- * bit does not exist and `X_OK` degrades to a readability check, so the extension carried by every
- * candidate name from `executableNames` is what makes a hit meaningful there.
- */
-export function realPagerEffects(env: NodeJS.ProcessEnv, run: Runner): PagerEffects {
+/** Requires X_OK on POSIX or a PATHEXT extension on Windows. */
+export function realPagerEffects(
+  env: NodeJS.ProcessEnv,
+  run: Runner,
+  platform: NodeJS.Platform = process.platform,
+): PagerEffects {
   const isExecutable = (path: string) => {
     try {
       if (!statSync(path).isFile()) return false;
-      accessSync(path, constants.X_OK);
+      if (platform !== "win32") accessSync(path, constants.X_OK);
       return true;
     } catch {
       return false;
     }
   };
-  const search = (name: string) => onPath(name, env.PATH, isExecutable, env.PATHEXT);
+  const search = (name: string) => onPath(name, env.PATH, isExecutable, env.PATHEXT, platform);
+  const runnablePath = (path: string) => {
+    if (!isExecutable(path)) return false;
+    if (platform !== "win32") return true;
+    return executableExtensions(env.PATHEXT).includes(win32.extname(path).toLowerCase());
+  };
   return {
     present: search,
     canRun: (nameOrPath) =>
-      looksLikePath(nameOrPath) ? isExecutable(nameOrPath) : search(nameOrPath),
+      looksLikePath(nameOrPath, platform) ? runnablePath(nameOrPath) : search(nameOrPath),
     git: run,
   };
 }

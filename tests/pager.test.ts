@@ -77,8 +77,7 @@ function fakeGitConfig(
 }
 
 describe("onPath", () => {
-  // Platform and PATHEXT are pinned in every case, so the suite asserts the same behaviour whichever
-  // OS runs it: the POSIX cases must not start consulting PATHEXT on a Windows runner.
+  // Keep POSIX cases independent of the test host.
   const POSIX: [string | undefined, NodeJS.Platform] = [undefined, "linux"];
 
   it("finds a binary that is executable in a PATH entry", () => {
@@ -104,8 +103,6 @@ describe("onPath", () => {
     );
   });
 
-  // Windows has no executable bit; a command is executable because of its extension. Searching for
-  // the bare name finds nothing, which would report git, jj and sl all absent on every Windows box.
   describe("on windows", () => {
     const PATHEXT = ".COM;.EXE;.BAT;.CMD";
 
@@ -140,6 +137,11 @@ describe("onPath", () => {
       const isExecutable = (p: string) => p === win32.join("C:\\tools", "git.exe");
       expect(onPath("git.exe", "C:\\tools", isExecutable, PATHEXT, "win32")).toBe(true);
     });
+
+    it("rejects a supplied extension that PATHEXT does not make executable", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "git.txt");
+      expect(onPath("git.txt", "C:\\tools", isExecutable, PATHEXT, "win32")).toBe(false);
+    });
   });
 });
 
@@ -149,8 +151,6 @@ describe("looksLikePath", () => {
     expect(looksLikePath("hunk", "linux")).toBe(false);
   });
 
-  // A backslash is an ordinary filename character on POSIX, so only windows may read it as a
-  // separator. Misreading `C:\tools\hunk.exe` as a bare name would send it to a PATH search.
   it("reads a backslash path as a path only on windows", () => {
     expect(looksLikePath("C:\\tools\\hunk.exe", "win32")).toBe(true);
     expect(looksLikePath("C:\\tools\\hunk.exe", "linux")).toBe(false);
@@ -158,9 +158,7 @@ describe("looksLikePath", () => {
 });
 
 describe("realPagerEffects.canRun", () => {
-  // A real file in a temp directory, rather than the host's own `/bin/sh`: what makes a file
-  // executable differs by platform — a mode bit on POSIX, an extension on Windows — so probing the
-  // system's own binaries would assert facts about the runner instead of about this code.
+  // Avoid assumptions about binaries installed on the test host.
   function probe(): { dir: string; command: string; file: string } {
     const dir = mkdtempSync(join(tmpdir(), "pager-bin-"));
     const command = "hunkprobe";
@@ -192,6 +190,23 @@ describe("realPagerEffects.canRun", () => {
   it("does not accept a directory", () => {
     const { dir } = probe();
     expect(effects(dir).canRun(dir)).toBe(false);
+  });
+
+  it("accepts a direct Windows command path only when its extension is in PATHEXT", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pager-win-bin-"));
+    const command = join(dir, "hunk.cmd");
+    const text = join(dir, "hunk.txt");
+    const extensionless = join(dir, "hunk");
+    for (const file of [command, text, extensionless]) writeFileSync(file, "probe");
+
+    const windows = realPagerEffects(
+      { PATH: "", PATHEXT: ".EXE;.CMD" },
+      () => ({ status: 0, stdout: "" }),
+      "win32",
+    );
+    expect(windows.canRun(command)).toBe(true);
+    expect(windows.canRun(text)).toBe(false);
+    expect(windows.canRun(extensionless)).toBe(false);
   });
 });
 

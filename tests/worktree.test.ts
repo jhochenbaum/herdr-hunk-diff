@@ -15,7 +15,6 @@ describe("worktreeKey", () => {
       expect(worktreeKey("/wt/y/../x", "linux")).toBe(worktreeKey("/wt/x", "linux"));
     });
 
-    // POSIX filesystems are case-sensitive, so folding case here would merge two real repositories.
     it("keeps paths that differ only in case distinct", () => {
       expect(worktreeKey("/wt/Repo", "linux")).not.toBe(worktreeKey("/wt/repo", "linux"));
     });
@@ -26,8 +25,6 @@ describe("worktreeKey", () => {
   });
 
   describe("on windows", () => {
-    // git answers `rev-parse --show-toplevel` with forward slashes even on Windows, while herdr's
-    // context and event payloads use backslashes. Both name one repository.
     it("gives the backslash and forward-slash spellings one identity", () => {
       expect(worktreeKey("C:\\Users\\x\\repo", "win32")).toBe(
         worktreeKey("C:/Users/x/repo", "win32"),
@@ -38,9 +35,26 @@ describe("worktreeKey", () => {
       expect(worktreeKey("c:\\repo", "win32")).toBe(worktreeKey("C:\\repo", "win32"));
     });
 
-    it("folds the rest of the path too, since windows compares filenames case-insensitively", () => {
-      expect(worktreeKey("C:\\Users\\X\\Repo", "win32")).toBe(
-        worktreeKey("c:\\users\\x\\repo", "win32"),
+    it("uses the filesystem's canonical spelling to unify aliases", () => {
+      const canonical = () => "C:\\Users\\X\\Repo";
+      expect(worktreeKey("C:\\Users\\X\\Repo", "win32", canonical)).toBe(
+        worktreeKey("c:\\users\\x\\repo", "win32", canonical),
+      );
+    });
+
+    it("keeps distinct casing when the filesystem says both paths exist", () => {
+      const asSpelled = (path: string) => path;
+      expect(worktreeKey("C:\\work\\Repo", "win32", asSpelled)).not.toBe(
+        worktreeKey("C:\\work\\repo", "win32", asSpelled),
+      );
+    });
+
+    it("keeps component case when a removed path cannot be resolved", () => {
+      const missing = () => {
+        throw new Error("ENOENT");
+      };
+      expect(worktreeKey("C:\\work\\Repo", "win32", missing)).not.toBe(
+        worktreeKey("C:\\work\\repo", "win32", missing),
       );
     });
 

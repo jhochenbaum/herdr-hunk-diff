@@ -11,7 +11,12 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import type { ResolvedTargetMode } from "./config.js";
-import { worktreeKey } from "./worktree.js";
+import {
+  worktreeAliasKey,
+  worktreeIdentity,
+  type WorktreeIdentity,
+  type WorktreeRealpath,
+} from "./worktree.js";
 
 export interface ReviewEntry {
   worktree: string;
@@ -37,6 +42,9 @@ const POLL_MS = 5;
 export interface ReviewIndexOptions {
   staleLockMs?: number;
   acquireTimeoutMs?: number;
+  /** Overrides used by cross-platform tests. */
+  platform?: NodeJS.Platform;
+  realpath?: WorktreeRealpath;
 }
 
 /** Blocks without spinning while another short-lived process holds the lock. */
@@ -44,16 +52,14 @@ function sleep(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-/**
- * Cross-process review state, keyed by `worktreeKey` so the same repository resolves to one entry
- * whichever spelling of its path a caller happens to hold. Mutations lock and reread the file;
- * writes use an atomic rename so concurrent readers never observe partial JSON.
- */
+/** Locked, atomically written review state keyed by worktree identity. */
 export class ReviewIndex {
   private readonly file: string;
   private readonly lockFile: string;
   private readonly staleLockMs: number;
   private readonly acquireTimeoutMs: number;
+  private readonly platform: NodeJS.Platform;
+  private readonly realpath?: WorktreeRealpath;
 
   constructor(stateDir: string, opts: ReviewIndexOptions = {}) {
     mkdirSync(stateDir, { recursive: true });
@@ -61,6 +67,35 @@ export class ReviewIndex {
     this.lockFile = `${this.file}.lock`;
     this.staleLockMs = opts.staleLockMs ?? STALE_LOCK_MS;
     this.acquireTimeoutMs = opts.acquireTimeoutMs ?? ACQUIRE_TIMEOUT_MS;
+    this.platform = opts.platform ?? process.platform;
+    this.realpath = opts.realpath;
+  }
+
+  private worktreeIdentity(worktree: string): WorktreeIdentity {
+    return this.realpath
+      ? worktreeIdentity(worktree, this.platform, this.realpath)
+      : worktreeIdentity(worktree, this.platform);
+  }
+
+  /** Accepts a missing Windows path's case-folded alias only when the match is unambiguous. */
+  private storedKey(
+    entries: Record<string, ReviewEntry>,
+    worktree: string,
+    identity: WorktreeIdentity = this.worktreeIdentity(worktree),
+  ): string {
+    const exact = identity.key;
+    if (Object.hasOwn(entries, exact) || this.platform !== "win32" || identity.canonical)
+      return exact;
+
+    const alias = worktreeAliasKey(worktree, this.platform);
+    const matches = Object.entries(entries)
+      .filter(([, entry]) => {
+        const storedWorktree =
+          entry && typeof entry.worktree === "string" ? entry.worktree : undefined;
+        return storedWorktree && worktreeAliasKey(storedWorktree, this.platform) === alias;
+      })
+      .map(([key]) => key);
+    return matches.length === 1 ? matches[0]! : exact;
   }
 
   private read(): Record<string, ReviewEntry> {
@@ -152,7 +187,8 @@ export class ReviewIndex {
   }
 
   get(worktree: string): ReviewEntry | undefined {
-    return this.read()[worktreeKey(worktree)];
+    const entries = this.read();
+    return entries[this.storedKey(entries, worktree)];
   }
 
   all(): ReviewEntry[] {
@@ -173,8 +209,10 @@ export class ReviewIndex {
    */
   upsert(entry: ReviewEntry): void {
     this.mutate((entries) => {
-      const key = worktreeKey(entry.worktree);
-      const existing = entries[key];
+      const identity = this.worktreeIdentity(entry.worktree);
+      const key = identity.key;
+      const previousKey = this.storedKey(entries, entry.worktree, identity);
+      const existing = entries[previousKey];
       const merged: Record<string, unknown> = { ...existing };
       for (const [key, value] of Object.entries(entry)) {
         if (value === undefined) continue;
@@ -183,6 +221,7 @@ export class ReviewIndex {
       }
       merged.sent = ReviewIndex.ids([...(existing?.sent ?? []), ...(entry.sent ?? [])]);
       merged.worktree = entry.worktree;
+      if (previousKey !== key) delete entries[previousKey];
       entries[key] = merged as unknown as ReviewEntry;
     });
   }
@@ -190,7 +229,7 @@ export class ReviewIndex {
   /** Clears the displayed pane while preserving agent and delivery history. */
   clearPane(worktree: string): void {
     this.mutate((entries) => {
-      const entry = entries[worktreeKey(worktree)];
+      const entry = entries[this.storedKey(entries, worktree)];
       if (!entry) return;
       delete entry.paneId;
     });
@@ -198,20 +237,24 @@ export class ReviewIndex {
 
   markSent(worktree: string, ids: string[]): void {
     this.mutate((entries) => {
-      const key = worktreeKey(worktree);
-      const entry = entries[key] ?? { worktree, sent: [] };
+      const identity = this.worktreeIdentity(worktree);
+      const key = identity.key;
+      const previousKey = this.storedKey(entries, worktree, identity);
+      const entry = entries[previousKey] ?? { worktree, sent: [] };
       entry.sent = ReviewIndex.ids([...(entry.sent ?? []), ...ids]);
+      if (previousKey !== key) delete entries[previousKey];
       entries[key] = entry;
     });
   }
 
   sentIds(worktree: string): string[] {
-    return ReviewIndex.ids(this.read()[worktreeKey(worktree)]?.sent);
+    const entries = this.read();
+    return ReviewIndex.ids(entries[this.storedKey(entries, worktree)]?.sent);
   }
 
   remove(worktree: string): void {
     this.mutate((entries) => {
-      delete entries[worktreeKey(worktree)];
+      delete entries[this.storedKey(entries, worktree)];
     });
   }
 }

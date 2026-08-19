@@ -1,6 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, posix, win32 } from "node:path";
 import {
   buildKeysBlock,
   ConfigParseError,
@@ -19,29 +19,28 @@ export interface Result {
   skipped?: Binding[];
 }
 
-/**
- * Mirrors Herdr's config precedence. `HERDR_CONFIG_PATH` is a literal file path, including an empty
- * value; otherwise XDG config wins over `~/.config`.
- *
- * Windows resolves to `%APPDATA%` and deliberately ignores `XDG_CONFIG_HOME`, because herdr
- * documents only the APPDATA location there. Guessing wrong is silent: the keys land in a file
- * herdr never reads, `setup-keys` reports success, and no keybinding works.
- */
+/** Mirrors Herdr v0.8: explicit path, XDG, then platform-specific fallbacks. */
 export function resolveHerdrConfigPath(
   env: NodeJS.ProcessEnv,
   platform: NodeJS.Platform = process.platform,
 ): string {
   const override = env.HERDR_CONFIG_PATH;
   if (override !== undefined) return override;
-  if (platform === "win32") {
-    // An empty APPDATA would make this a relative path, resolved against whatever cwd we happen
-    // to have; fall back to its standard location instead.
-    const appData = env.APPDATA ? env.APPDATA : join(homedir(), "AppData", "Roaming");
-    return join(appData, "herdr", "config.toml");
-  }
+
+  const join = platform === "win32" ? win32.join : posix.join;
   const xdg = env.XDG_CONFIG_HOME;
   if (xdg !== undefined) return join(xdg, "herdr", "config.toml");
-  return join(homedir(), ".config", "herdr", "config.toml");
+
+  if (platform === "win32") {
+    if (env.APPDATA !== undefined) return join(env.APPDATA, "herdr", "config.toml");
+    if (env.USERPROFILE !== undefined)
+      return join(env.USERPROFILE, "AppData", "Roaming", "herdr", "config.toml");
+    if (env.HOME !== undefined) return join(env.HOME, ".config", "herdr", "config.toml");
+    return join(tmpdir(), "herdr", "config.toml");
+  }
+
+  const configHome = env.HOME !== undefined ? join(env.HOME, ".config") : tmpdir();
+  return join(configHome, "herdr", "config.toml");
 }
 
 function noConfigPath(): Result {
