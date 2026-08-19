@@ -1,5 +1,5 @@
 import { accessSync, constants, statSync } from "node:fs";
-import { delimiter, join } from "node:path";
+import { posix, win32 } from "node:path";
 import type { Runner } from "./git.js";
 
 /** Pager setup with injected effects because Git configuration is global user state. */
@@ -40,20 +40,66 @@ export interface PagerEffects {
   canRun: (nameOrPath: string) => boolean;
 }
 
+/**
+ * Path semantics of the platform being asked about, rather than the one this process runs on:
+ * separators, PATH delimiter and drive letters all differ, and every function here takes an
+ * explicit platform so its behaviour can be asserted from either host.
+ */
+function pathFor(platform: NodeJS.Platform): typeof posix {
+  return platform === "win32" ? win32 : posix;
+}
+
+/** A value naming a location on disk rather than a command to look up on PATH. */
+export function looksLikePath(
+  value: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return value.includes("/") || (platform === "win32" && value.includes("\\"));
+}
+
+/**
+ * Names a bare command can have on disk. Windows has no executable bit: a command is executable
+ * because of its extension, and `git` on PATH is `git.exe`, so searching for the bare name finds
+ * nothing at all. PATHEXT lists the extensions the OS will try, with a documented default for the
+ * rare environment that does not set it.
+ */
+export function executableNames(
+  name: string,
+  pathExt: string | undefined,
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  if (platform !== "win32" || pathFor(platform).extname(name) !== "") return [name];
+  const extensions = (pathExt ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .map((ext) => ext.trim().toLowerCase())
+    .filter((ext) => ext.startsWith("."));
+  // PATHEXT is conventionally uppercase and Windows compares filenames case-insensitively, so the
+  // case here is cosmetic — lowercase keeps the candidate paths readable where they get reported.
+  return extensions.map((ext) => `${name}${ext}`);
+}
+
 /** Searches PATH, excluding empty entries that would implicitly search the current worktree. */
 export function onPath(
   name: string,
   pathEnv: string | undefined,
   isExecutable: (path: string) => boolean,
+  pathExt: string | undefined = process.env.PATHEXT,
+  platform: NodeJS.Platform = process.platform,
 ): boolean {
   if (!pathEnv) return false;
+  const { delimiter, join: joinFor } = pathFor(platform);
+  const candidates = executableNames(name, pathExt, platform);
   return pathEnv
     .split(delimiter)
     .filter((dir) => dir.length > 0)
-    .some((dir) => isExecutable(join(dir, name)));
+    .some((dir) => candidates.some((candidate) => isExecutable(joinFor(dir, candidate))));
 }
 
-/** Real effects require an executable file; `X_OK` alone also accepts directories. */
+/**
+ * Real effects require an executable file; `X_OK` alone also accepts directories. On Windows the
+ * bit does not exist and `X_OK` degrades to a readability check, so the extension carried by every
+ * candidate name from `executableNames` is what makes a hit meaningful there.
+ */
 export function realPagerEffects(env: NodeJS.ProcessEnv, run: Runner): PagerEffects {
   const isExecutable = (path: string) => {
     try {
@@ -64,12 +110,11 @@ export function realPagerEffects(env: NodeJS.ProcessEnv, run: Runner): PagerEffe
       return false;
     }
   };
+  const search = (name: string) => onPath(name, env.PATH, isExecutable, env.PATHEXT);
   return {
-    present: (vcs) => onPath(vcs, env.PATH, isExecutable),
+    present: search,
     canRun: (nameOrPath) =>
-      nameOrPath.includes("/")
-        ? isExecutable(nameOrPath)
-        : onPath(nameOrPath, env.PATH, isExecutable),
+      looksLikePath(nameOrPath) ? isExecutable(nameOrPath) : search(nameOrPath),
     git: run,
   };
 }
@@ -190,8 +235,8 @@ export function installPager(effects: PagerEffects, hunkBin = "auto"): PagerResu
 }
 
 /** Relative paths are unsafe in global config; bare command names are resolved through PATH. */
-function isRelativePath(bin: string): boolean {
-  return bin.includes("/") && !bin.startsWith("/");
+function isRelativePath(bin: string, platform: NodeJS.Platform = process.platform): boolean {
+  return looksLikePath(bin, platform) && !pathFor(platform).isAbsolute(bin);
 }
 
 function unrunnableHunk(hunkBin: string, bin: string, manualToo: boolean): string {

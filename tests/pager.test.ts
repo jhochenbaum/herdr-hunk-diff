@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { delimiter, join } from "node:path";
+import { delimiter, join, win32 } from "node:path";
 import {
   installPager,
+  looksLikePath,
   MANUAL_PAGER_SETUP,
   onPath,
   realPagerEffects,
@@ -74,25 +75,83 @@ function fakeGitConfig(
 }
 
 describe("onPath", () => {
+  // Platform and PATHEXT are pinned in every case, so the suite asserts the same behaviour whichever
+  // OS runs it: the POSIX cases must not start consulting PATHEXT on a Windows runner.
+  const POSIX: [string | undefined, NodeJS.Platform] = [undefined, "linux"];
+
   it("finds a binary that is executable in a PATH entry", () => {
     const { pathEnv, isExecutable } = fakePath("git");
-    expect(onPath("git", pathEnv, isExecutable)).toBe(true);
+    expect(onPath("git", pathEnv, isExecutable, ...POSIX)).toBe(true);
   });
 
   it("does not find a binary that is in no PATH entry", () => {
     const { pathEnv, isExecutable } = fakePath("git");
-    expect(onPath("jj", pathEnv, isExecutable)).toBe(false);
-    expect(onPath("sl", pathEnv, isExecutable)).toBe(false);
+    expect(onPath("jj", pathEnv, isExecutable, ...POSIX)).toBe(false);
+    expect(onPath("sl", pathEnv, isExecutable, ...POSIX)).toBe(false);
   });
 
   it("finds nothing when PATH is absent or empty", () => {
     const { isExecutable } = fakePath("git");
-    expect(onPath("git", undefined, isExecutable)).toBe(false);
-    expect(onPath("git", "", isExecutable)).toBe(false);
+    expect(onPath("git", undefined, isExecutable, ...POSIX)).toBe(false);
+    expect(onPath("git", "", isExecutable, ...POSIX)).toBe(false);
   });
 
   it("skips an empty PATH entry rather than resolving it relative to the cwd", () => {
-    expect(onPath("git", "/usr/bin:", (p) => p === "git" || p === join(".", "git"))).toBe(false);
+    expect(onPath("git", "/usr/bin:", (p) => p === "git" || p === join(".", "git"), ...POSIX)).toBe(
+      false,
+    );
+  });
+
+  // Windows has no executable bit; a command is executable because of its extension. Searching for
+  // the bare name finds nothing, which would report git, jj and sl all absent on every Windows box.
+  describe("on windows", () => {
+    const PATHEXT = ".COM;.EXE;.BAT;.CMD";
+
+    it("finds git.exe when the search name is bare git", () => {
+      const isExecutable = (p: string) => p === "C:\\Program Files\\Git\\cmd\\git.exe";
+      expect(onPath("git", "C:\\Program Files\\Git\\cmd", isExecutable, PATHEXT, "win32")).toBe(
+        true,
+      );
+    });
+
+    it("finds a command shipped as a .cmd shim", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "hunk.cmd");
+      expect(onPath("hunk", "C:\\tools", isExecutable, PATHEXT, "win32")).toBe(true);
+    });
+
+    it("does not accept an extensionless file, which windows cannot execute", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "git");
+      expect(onPath("git", "C:\\tools", isExecutable, PATHEXT, "win32")).toBe(false);
+    });
+
+    it("honours a PATHEXT that omits an extension", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "hunk.cmd");
+      expect(onPath("hunk", "C:\\tools", isExecutable, ".EXE", "win32")).toBe(false);
+    });
+
+    it("falls back to the standard PATHEXT when the variable is unset", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "git.exe");
+      expect(onPath("git", "C:\\tools", isExecutable, undefined, "win32")).toBe(true);
+    });
+
+    it("searches a name that already carries an extension as given", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "git.exe");
+      expect(onPath("git.exe", "C:\\tools", isExecutable, PATHEXT, "win32")).toBe(true);
+    });
+  });
+});
+
+describe("looksLikePath", () => {
+  it("treats a posix path as a path and a bare name as a command", () => {
+    expect(looksLikePath("/usr/local/bin/hunk", "linux")).toBe(true);
+    expect(looksLikePath("hunk", "linux")).toBe(false);
+  });
+
+  // A backslash is an ordinary filename character on POSIX, so only windows may read it as a
+  // separator. Misreading `C:\tools\hunk.exe` as a bare name would send it to a PATH search.
+  it("reads a backslash path as a path only on windows", () => {
+    expect(looksLikePath("C:\\tools\\hunk.exe", "win32")).toBe(true);
+    expect(looksLikePath("C:\\tools\\hunk.exe", "linux")).toBe(false);
   });
 });
 

@@ -22,10 +22,23 @@ export interface Result {
 /**
  * Mirrors Herdr's config precedence. `HERDR_CONFIG_PATH` is a literal file path, including an empty
  * value; otherwise XDG config wins over `~/.config`.
+ *
+ * Windows resolves to `%APPDATA%` and deliberately ignores `XDG_CONFIG_HOME`, because herdr
+ * documents only the APPDATA location there. Guessing wrong is silent: the keys land in a file
+ * herdr never reads, `setup-keys` reports success, and no keybinding works.
  */
-export function resolveHerdrConfigPath(env: NodeJS.ProcessEnv): string {
+export function resolveHerdrConfigPath(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform,
+): string {
   const override = env.HERDR_CONFIG_PATH;
   if (override !== undefined) return override;
+  if (platform === "win32") {
+    // An empty APPDATA would make this a relative path, resolved against whatever cwd we happen
+    // to have; fall back to its standard location instead.
+    const appData = env.APPDATA ? env.APPDATA : join(homedir(), "AppData", "Roaming");
+    return join(appData, "herdr", "config.toml");
+  }
   const xdg = env.XDG_CONFIG_HOME;
   if (xdg !== undefined) return join(xdg, "herdr", "config.toml");
   return join(homedir(), ".config", "herdr", "config.toml");
@@ -118,8 +131,8 @@ export function installKeys(configPath: string, bindings: Binding[]): Result {
       ok: true,
       message:
         skipped.length === 0
-          ? `Installed ${installable.length} keybinding(s). ${reload}`
-          : `Installed ${installable.length} of ${bindings.length} keybinding(s). Skipped ` +
+          ? `Installed ${installable.length} keybinding(s) in ${configPath}. ${reload}`
+          : `Installed ${installable.length} of ${bindings.length} keybinding(s) in ${configPath}. Skipped ` +
             `${describe(skipped)} — already bound in your herdr config, and left untouched. ` +
             `Bind those actions to keys of your own if you want them. ${reload}`,
       backup: saved,

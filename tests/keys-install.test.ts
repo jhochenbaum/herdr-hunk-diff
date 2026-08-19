@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { DEFAULT_BINDINGS, buildKeysBlock } from "../src/keys.js";
 import { installKeys, removeKeys, resolveHerdrConfigPath } from "../src/keys-install.js";
 
@@ -28,7 +28,7 @@ describe("resolveHerdrConfigPath", () => {
   const DEFAULT = join(homedir(), ".config", "herdr", "config.toml");
 
   it("falls back to ~/.config/herdr/config.toml when nothing overrides it", () => {
-    expect(resolveHerdrConfigPath({})).toBe(DEFAULT);
+    expect(resolveHerdrConfigPath({}, "darwin")).toBe(DEFAULT);
   });
 
   it("uses HERDR_CONFIG_PATH when it is set", () => {
@@ -52,7 +52,9 @@ describe("resolveHerdrConfigPath", () => {
   });
 
   it("reads $XDG_CONFIG_HOME/herdr/config.toml when HERDR_CONFIG_PATH is unset", () => {
-    expect(resolveHerdrConfigPath({ XDG_CONFIG_HOME: "/b" })).toBe("/b/herdr/config.toml");
+    expect(resolveHerdrConfigPath({ XDG_CONFIG_HOME: "/b" }, "linux")).toBe(
+      join("/b", "herdr", "config.toml"),
+    );
   });
 
   it("returns a path that does not exist yet, and setup-keys creates it there", () => {
@@ -79,6 +81,39 @@ describe("resolveHerdrConfigPath", () => {
     const res = removeKeys("");
     expect(res.ok).toBe(false);
     expect(res.message).toContain("HERDR_CONFIG_PATH");
+  });
+
+  // herdr documents `%APPDATA%\herdr\config.toml` on Windows. Writing anywhere else there would
+  // report success and install nothing herdr ever loads.
+  describe("on windows", () => {
+    it("reads %APPDATA%/herdr/config.toml", () => {
+      expect(resolveHerdrConfigPath({ APPDATA: "C:\\Users\\x\\AppData\\Roaming" }, "win32")).toBe(
+        join("C:\\Users\\x\\AppData\\Roaming", "herdr", "config.toml"),
+      );
+    });
+
+    it("ignores XDG_CONFIG_HOME, which herdr does not read on windows", () => {
+      const path = resolveHerdrConfigPath(
+        { APPDATA: "C:\\Users\\x\\AppData\\Roaming", XDG_CONFIG_HOME: "C:\\xdg" },
+        "win32",
+      );
+      expect(path).toBe(join("C:\\Users\\x\\AppData\\Roaming", "herdr", "config.toml"));
+    });
+
+    it("still honours an explicit HERDR_CONFIG_PATH", () => {
+      expect(
+        resolveHerdrConfigPath(
+          { APPDATA: "C:\\Roaming", HERDR_CONFIG_PATH: "D:\\mine.toml" },
+          "win32",
+        ),
+      ).toBe("D:\\mine.toml");
+    });
+
+    it("falls back to the standard APPDATA location rather than a relative path", () => {
+      const path = resolveHerdrConfigPath({ APPDATA: "" }, "win32");
+      expect(path).toBe(join(homedir(), "AppData", "Roaming", "herdr", "config.toml"));
+      expect(isAbsolute(path)).toBe(true);
+    });
   });
 });
 
