@@ -117,17 +117,26 @@ export function canReload(mode: Target["mode"]): boolean {
 }
 
 export class HunkAdapter {
-  constructor(private readonly bin: string) {}
+  constructor(
+    private readonly bin: string,
+    /** Precedes hunk's own argv, so the bundled launcher can run under a chosen Node. */
+    private readonly prefix: string[] = [],
+  ) {}
+
+  /** Names the whole command, since `bin` alone may be a Node that says nothing about hunk. */
+  private get command(): string {
+    return [this.bin, ...this.prefix].join(" ");
+  }
 
   private run(args: string[], stdin?: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const child = spawn(this.bin, args, { stdio: ["pipe", "pipe", "pipe"] });
+      const child = spawn(this.bin, [...this.prefix, ...args], { stdio: ["pipe", "pipe", "pipe"] });
       let out = "";
       let err = "";
       child.stdout.on("data", (d) => (out += d));
       child.stderr.on("data", (d) => (err += d));
       child.on("error", () =>
-        reject(new HunkUnavailableError("missing-binary", `hunk not executable: ${this.bin}`)),
+        reject(new HunkUnavailableError("missing-binary", `hunk not executable: ${this.command}`)),
       );
       child.on("close", (code) => {
         if (code === 0) return resolve(out);

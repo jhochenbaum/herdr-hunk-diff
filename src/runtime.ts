@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { loadConfig, type PluginConfig, type TargetMode } from "./config.js";
 import { readContext, type HerdrContext } from "./context.js";
-import { HerdrAdapter, reportFailure, resolveHunkBin } from "./herdr.js";
+import { HerdrAdapter, reportFailure, resolveHunkLauncher } from "./herdr.js";
 import { canReload, HunkAdapter, HunkProtocolError, HunkUnavailableError } from "./hunk.js";
 import { ReviewIndex, type ReviewEntry } from "./index-store.js";
 import { formatReview, selectUnsent } from "./courier.js";
@@ -55,6 +55,7 @@ export function buildRuntime(env: NodeJS.ProcessEnv): Runtime {
   };
 
   const stateDir = env.HERDR_PLUGIN_STATE_DIR ?? ".";
+  const hunkLauncher = resolveHunkLauncher(cfg, pluginRoot);
 
   return {
     cfg,
@@ -63,7 +64,7 @@ export function buildRuntime(env: NodeJS.ProcessEnv): Runtime {
     stateDir,
     index: new ReviewIndex(stateDir),
     herdr: new HerdrAdapter(env.HERDR_BIN_PATH ?? "herdr"),
-    hunk: new HunkAdapter(resolveHunkBin(cfg, pluginRoot)),
+    hunk: new HunkAdapter(hunkLauncher.bin, hunkLauncher.prefix),
     targetFor,
     commitExists: (repo, ref) => commitExists(repo, ref, realRunner(repo)),
     get target(): Target {

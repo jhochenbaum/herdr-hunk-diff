@@ -13,8 +13,11 @@ import {
   parseHunkComments,
 } from "../src/hunk.js";
 
-const FAKE = fileURLToPath(new URL("./fixtures/fake-hunk", import.meta.url));
-const hunk = new HunkAdapter(FAKE);
+// The fixture is a Node script run under this process's own Node, mirroring how the real bundled
+// hunk is launched — and unlike a shebang script, that works on Windows too.
+const FAKE = fileURLToPath(new URL("./fixtures/fake-hunk.js", import.meta.url));
+const fakeHunk = () => new HunkAdapter(process.execPath, [FAKE]);
+const hunk = fakeHunk();
 
 describe("buildLaunchArgs", () => {
   it("builds a working-tree review", () => {
@@ -214,7 +217,7 @@ describe("HunkAdapter.navigate argument construction", () => {
   async function navigateArgs(opts: Parameters<HunkAdapter["navigate"]>[1]): Promise<string> {
     const file = join(mkdtempSync(join(tmpdir(), "hunk-args-")), "argv.txt");
     process.env.HUNK_FIXTURE_ARGS_FILE = file;
-    await new HunkAdapter(FAKE).navigate("/wt/x", opts);
+    await fakeHunk().navigate("/wt/x", opts);
     return readFileSync(file, "utf8").trim();
   }
 
@@ -272,7 +275,7 @@ describe("HunkAdapter.reload argument construction", () => {
   ): Promise<string> {
     const file = join(mkdtempSync(join(tmpdir(), "hunk-args-")), "argv.txt");
     process.env.HUNK_FIXTURE_ARGS_FILE = file;
-    await new HunkAdapter(FAKE).reload("/wt/x", target, cfg);
+    await fakeHunk().reload("/wt/x", target, cfg);
     return readFileSync(file, "utf8").trim();
   }
 
@@ -308,7 +311,7 @@ describe("HunkAdapter.reload argument construction", () => {
 
   it("refuses to reload a stash review rather than reloading a plain diff instead", async () => {
     await expect(
-      new HunkAdapter(FAKE).reload("/wt/x", { worktree: "/wt/x", mode: "stash" }, DEFAULTS),
+      fakeHunk().reload("/wt/x", { worktree: "/wt/x", mode: "stash" }, DEFAULTS),
     ).rejects.toThrow(/cannot reload a stash review/i);
   });
 
@@ -381,7 +384,7 @@ describe("HunkAdapter --json placement across every caller", () => {
   async function argvOf(call: (h: HunkAdapter) => Promise<unknown>): Promise<string> {
     const file = join(mkdtempSync(join(tmpdir(), "hunk-args-")), "argv.txt");
     process.env.HUNK_FIXTURE_ARGS_FILE = file;
-    await call(new HunkAdapter(FAKE));
+    await call(fakeHunk());
     return readFileSync(file, "utf8").trim();
   }
 
@@ -404,7 +407,7 @@ describe("HunkAdapter --json placement across every caller", () => {
 
 describe("fake-hunk argv strictness", () => {
   it("refuses a --json that appears after the `--` separator, matching Hunk", async () => {
-    const adapter = new HunkAdapter(FAKE) as unknown as {
+    const adapter = fakeHunk() as unknown as {
       json: (args: string[]) => Promise<unknown>;
     };
     await expect(
@@ -413,7 +416,7 @@ describe("fake-hunk argv strictness", () => {
   });
 
   describe("fake-hunk `session navigate` strictness", () => {
-    const adapter = new HunkAdapter(FAKE) as unknown as {
+    const adapter = fakeHunk() as unknown as {
       json: (args: string[]) => Promise<unknown>;
     };
 
@@ -497,12 +500,12 @@ describe("HunkAdapter", () => {
   });
 
   it("classifies a missing session as loopback-blocked-or-absent", async () => {
-    const broken = new HunkAdapter(FAKE);
+    const broken = fakeHunk();
     await expect(broken.getSession("__no_session__")).rejects.toBeInstanceOf(HunkUnavailableError);
   });
 
   it("tags the no-session error with the sandbox loopback hint", async () => {
-    const broken = new HunkAdapter(FAKE);
+    const broken = fakeHunk();
     await expect(broken.getSession("__no_session__")).rejects.toMatchObject({
       reason: "no-session",
       message: expect.stringContaining("127.0.0.1:47657"),
@@ -513,6 +516,16 @@ describe("HunkAdapter", () => {
     const missing = new HunkAdapter("/nonexistent/bin/hunk-does-not-exist");
     await expect(missing.getSession("/wt/x")).rejects.toMatchObject({
       reason: "missing-binary",
+    });
+  });
+
+  // With the bundled launcher the spawned executable is a Node, so reporting `bin` alone would name
+  // a working interpreter and say nothing about which hunk failed to run.
+  it("names the launcher script in the missing-binary message, not just the interpreter", async () => {
+    const missing = new HunkAdapter("/nonexistent/node", ["/plugin/hunkdiff/bin/hunk.cjs"]);
+    await expect(missing.getSession("/wt/x")).rejects.toMatchObject({
+      reason: "missing-binary",
+      message: expect.stringContaining("hunk.cjs"),
     });
   });
 });

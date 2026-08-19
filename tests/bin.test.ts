@@ -8,6 +8,18 @@ import { ReviewIndex } from "../src/index-store.js";
 import { sidecarPath, writeNotesSidecar } from "../src/notes.js";
 import type { Runtime } from "../src/runtime.js";
 
+/**
+ * hunk is spawned as `node <bundled launcher> …`, never as the `node_modules/.bin` shim, so the
+ * argv a test cares about starts after that prefix. Asserting the prefix here keeps every caller
+ * from having to know about it, and fails loudly if the launcher stops being used.
+ */
+function hunkArgs(call: [string, string[], ...unknown[]]): string[] {
+  const [bin, args] = call;
+  expect(bin).toBe(process.execPath);
+  expect(args[0]).toMatch(/hunkdiff[/\\]bin[/\\]hunk\.cjs$/);
+  return args.slice(1);
+}
+
 describe("pane.ts resolveAndRun", () => {
   it("reports a non-zero hunk exit, which the closing pane would otherwise swallow", () => {
     const configDir = mkdtempSync(join(tmpdir(), "pane-cfg-"));
@@ -66,9 +78,7 @@ describe("pane.ts resolveAndRun", () => {
 
     resolveAndRun(env, "/wt/resolved", spawn);
 
-    const [bin, args] = spawn.mock.calls[0];
-    expect(typeof bin).toBe("string");
-    expect(args[0]).toBe("diff");
+    expect(hunkArgs(spawn.mock.calls[0])[0]).toBe("diff");
   });
 
   it("passes --agent-context pointing at a sidecar previously written for this worktree", () => {
@@ -86,7 +96,7 @@ describe("pane.ts resolveAndRun", () => {
 
     resolveAndRun(env, "/wt/resolved", spawn);
 
-    const [, args] = spawn.mock.calls[0];
+    const args = hunkArgs(spawn.mock.calls[0]);
     const idx = args.indexOf("--agent-context");
     expect(idx).toBeGreaterThan(-1);
     expect(args[idx + 1]).toBe(expectedPath);
@@ -104,8 +114,7 @@ describe("pane.ts resolveAndRun", () => {
 
     resolveAndRun(env, "/wt/resolved", spawn);
 
-    const [, args] = spawn.mock.calls[0];
-    expect(args).not.toContain("--agent-context");
+    expect(hunkArgs(spawn.mock.calls[0])).not.toContain("--agent-context");
   });
 
   it("does not confuse a sidecar written for a different worktree with this one's", () => {
@@ -123,8 +132,7 @@ describe("pane.ts resolveAndRun", () => {
 
     resolveAndRun(env, "/wt/resolved", spawn);
 
-    const [, args] = spawn.mock.calls[0];
-    expect(args).not.toContain("--agent-context");
+    expect(hunkArgs(spawn.mock.calls[0])).not.toContain("--agent-context");
     expect(() => readFileSync(sidecarPath(stateDir, "/wt/other"))).not.toThrow();
   });
 
@@ -144,28 +152,28 @@ describe("pane.ts resolveAndRun", () => {
 
     it("launches `hunk diff --staged` for review:staged", () => {
       const { spawn } = launch("review:staged");
-      expect(spawn.mock.calls[0][1].slice(0, 2)).toEqual(["diff", "--staged"]);
+      expect(hunkArgs(spawn.mock.calls[0]).slice(0, 2)).toEqual(["diff", "--staged"]);
     });
 
     it("launches `hunk show` for review:commit", () => {
       const { spawn } = launch("review:commit");
-      expect(spawn.mock.calls[0][1].slice(0, 1)).toEqual(["show"]);
+      expect(hunkArgs(spawn.mock.calls[0]).slice(0, 1)).toEqual(["show"]);
     });
 
     it("launches `hunk stash show` for review:stash", () => {
       const { spawn } = launch("review:stash");
-      expect(spawn.mock.calls[0][1].slice(0, 2)).toEqual(["stash", "show"]);
+      expect(hunkArgs(spawn.mock.calls[0]).slice(0, 2)).toEqual(["stash", "show"]);
     });
 
     it("falls back to the config-driven target when given no action id at all", () => {
       const { spawn } = launch(undefined);
-      expect(spawn.mock.calls[0][1][0]).toBe("diff");
-      expect(spawn.mock.calls[0][1]).not.toContain("--staged");
+      expect(hunkArgs(spawn.mock.calls[0])[0]).toBe("diff");
+      expect(hunkArgs(spawn.mock.calls[0])).not.toContain("--staged");
     });
 
     it("ignores an argument that is not a review action id", () => {
       const { spawn } = launch("send-review");
-      expect(spawn.mock.calls[0][1][0]).toBe("diff");
+      expect(hunkArgs(spawn.mock.calls[0])[0]).toBe("diff");
     });
 
     it("launches every review action it is given, since none needs an operand", () => {
@@ -190,7 +198,7 @@ describe("pane.ts resolveAndRun", () => {
         sent: [],
       });
       const { spawn } = launch("review:commit", { HERDR_PLUGIN_STATE_DIR: stateDir });
-      expect(spawn.mock.calls[0][1].slice(0, 2)).toEqual(["show", "abc1234def"]);
+      expect(hunkArgs(spawn.mock.calls[0]).slice(0, 2)).toEqual(["show", "abc1234def"]);
     });
 
     it("does not apply a recorded commit-ish to a review that is not a commit review", () => {
@@ -201,7 +209,7 @@ describe("pane.ts resolveAndRun", () => {
         sent: [],
       });
       const { spawn } = launch("review:staged", { HERDR_PLUGIN_STATE_DIR: stateDir });
-      expect(spawn.mock.calls[0][1]).not.toContain("abc1234def");
+      expect(hunkArgs(spawn.mock.calls[0])).not.toContain("abc1234def");
     });
 
     describe("the ref the action recorded", () => {
@@ -213,18 +221,18 @@ describe("pane.ts resolveAndRun", () => {
 
       it("applies a recorded ref to a branch review, which would otherwise derive its own", () => {
         const { spawn } = launchWithRecord("review:branch", { requestedRef: "main...feature" });
-        expect(spawn.mock.calls[0][1].slice(0, 2)).toEqual(["diff", "main...feature"]);
+        expect(hunkArgs(spawn.mock.calls[0]).slice(0, 2)).toEqual(["diff", "main...feature"]);
       });
 
       it("applies a recorded ref to a stash review", () => {
         const { spawn } = launchWithRecord("review:stash", { requestedRef: "stash@{2}" });
-        expect(spawn.mock.calls[0][1].slice(0, 3)).toEqual(["stash", "show", "stash@{2}"]);
+        expect(hunkArgs(spawn.mock.calls[0]).slice(0, 3)).toEqual(["stash", "show", "stash@{2}"]);
       });
 
       it("ignores a recorded ref for an action that takes none", () => {
         for (const id of ["review", "review:staged"]) {
           const { spawn } = launchWithRecord(id, { requestedRef: "abc1234def" });
-          expect(spawn.mock.calls[0][1], id).not.toContain("abc1234def");
+          expect(hunkArgs(spawn.mock.calls[0]), id).not.toContain("abc1234def");
         }
       });
     });

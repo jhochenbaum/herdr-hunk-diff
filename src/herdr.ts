@@ -20,9 +20,28 @@ export function reportFailure(herdr: { notify: (message: string) => void }, mess
   return 1;
 }
 
-export function resolveHunkBin(cfg: PluginConfig, pluginRoot: string): string {
-  if (cfg.hunk.bin !== "auto") return cfg.hunk.bin;
-  return join(pluginRoot, "node_modules", ".bin", "hunk");
+/** How to spawn hunk: an executable, plus any arguments that precede hunk's own argv. */
+export interface HunkLauncher {
+  bin: string;
+  prefix: string[];
+}
+
+/**
+ * The bundled hunk is a Node launcher (`hunk.cjs`) that execs a prebuilt binary, and
+ * `node_modules/.bin/hunk` is only a shim over it: a symlink on POSIX, but `hunk.cmd` on Windows,
+ * which Node refuses to spawn without a shell. Running the launcher under this process's own Node
+ * skips the shim on every platform, so no code path depends on how npm chose to wrap it.
+ */
+export function resolveHunkLauncher(
+  cfg: PluginConfig,
+  pluginRoot: string,
+  execPath: string = process.execPath,
+): HunkLauncher {
+  if (cfg.hunk.bin !== "auto") return { bin: cfg.hunk.bin, prefix: [] };
+  return {
+    bin: execPath,
+    prefix: [join(pluginRoot, "node_modules", "hunkdiff", "bin", "hunk.cjs")],
+  };
 }
 
 export class HerdrAdapter {

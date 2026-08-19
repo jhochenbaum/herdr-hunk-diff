@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { loadConfig } from "../config.js";
-import { HerdrAdapter, resolveHunkBin } from "../herdr.js";
+import { HerdrAdapter, resolveHunkLauncher } from "../herdr.js";
 import { HunkAdapter } from "../hunk.js";
 import { ReviewIndex } from "../index-store.js";
 import { hasCommitsAhead, realRunner, repoRoot, resolveBaseRef } from "../git.js";
@@ -17,7 +17,8 @@ const defaultDeps: EventBinDeps = {
   buildDeps: (env) => {
     const herdr = new HerdrAdapter(env.HERDR_BIN_PATH ?? "herdr");
     const cfg = loadConfig(env.HERDR_PLUGIN_CONFIG_DIR ?? ".");
-    const hunk = new HunkAdapter(resolveHunkBin(cfg, env.HERDR_PLUGIN_ROOT ?? process.cwd()));
+    const launcher = resolveHunkLauncher(cfg, env.HERDR_PLUGIN_ROOT ?? process.cwd());
+    const hunk = new HunkAdapter(launcher.bin, launcher.prefix);
     return {
       cfg,
       index: new ReviewIndex(env.HERDR_PLUGIN_STATE_DIR ?? "."),

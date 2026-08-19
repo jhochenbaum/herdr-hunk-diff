@@ -1,15 +1,31 @@
 import { describe, expect, it } from "vitest";
+import { join } from "node:path";
 import { DEFAULTS } from "../src/config.js";
-import { HerdrAdapter, resolveHunkBin } from "../src/herdr.js";
+import { HerdrAdapter, resolveHunkLauncher } from "../src/herdr.js";
 
-describe("resolveHunkBin", () => {
+describe("resolveHunkLauncher", () => {
   it("prefers the bundled hunkdiff when bin is auto", () => {
-    expect(resolveHunkBin(DEFAULTS, "/plugin")).toBe("/plugin/node_modules/.bin/hunk");
+    expect(resolveHunkLauncher(DEFAULTS, "/plugin", "/bin/node")).toEqual({
+      bin: "/bin/node",
+      prefix: [join("/plugin", "node_modules", "hunkdiff", "bin", "hunk.cjs")],
+    });
   });
 
-  it("honours an explicit binary path", () => {
+  it("runs it under this process's own node by default", () => {
+    expect(resolveHunkLauncher(DEFAULTS, "/plugin").bin).toBe(process.execPath);
+  });
+
+  // npm writes `node_modules/.bin/hunk` as a symlink on POSIX but as `hunk.cmd` on Windows, and
+  // Node refuses to spawn a batch file without a shell. Reaching past the shim to the launcher it
+  // wraps keeps one spawn path working on every platform.
+  it("never reaches for the node_modules/.bin shim", () => {
+    const { bin, prefix } = resolveHunkLauncher(DEFAULTS, "/plugin");
+    expect([bin, ...prefix].join(" ")).not.toContain(".bin");
+  });
+
+  it("honours an explicit binary path, spawning it with no launcher in front", () => {
     const cfg = { ...DEFAULTS, hunk: { ...DEFAULTS.hunk, bin: "/usr/local/bin/hunk" } };
-    expect(resolveHunkBin(cfg, "/plugin")).toBe("/usr/local/bin/hunk");
+    expect(resolveHunkLauncher(cfg, "/plugin")).toEqual({ bin: "/usr/local/bin/hunk", prefix: [] });
   });
 });
 
