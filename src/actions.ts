@@ -43,8 +43,18 @@ const PANE_ENTRYPOINTS: Record<string, string> = {
   "review:stash": "review-stash",
 };
 
-export function paneEntrypointFor(id: ReviewActionId): string {
+/**
+ * Suffix of the Windows twin of each pane. A pane command cannot reach the plugin root without a
+ * shell to expand it, herdr expands nothing itself, and one pane id cannot carry two commands, so
+ * every mode declares a `sh` entry and a `cmd` entry under distinct ids.
+ */
+export const WINDOWS_PANE_SUFFIX = "-windows";
+
+export function paneEntrypointFor(
+  id: ReviewActionId,
+  platform: NodeJS.Platform = process.platform,
+): string {
   const entrypoint = PANE_ENTRYPOINTS[id];
   if (!entrypoint) throw new Error(`No review pane entrypoint for action "${id}"`);
-  return entrypoint;
+  return platform === "win32" ? `${entrypoint}${WINDOWS_PANE_SUFFIX}` : entrypoint;
 }
