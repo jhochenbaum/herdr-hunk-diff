@@ -45,8 +45,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
         run: npm audit --audit-level=high
 
-      # Formatting and lint are platform-independent, and a Windows checkout may carry CRLF line
-      # endings that prettier would reject for reasons that have nothing to do with the code.
+      # Formatting and lint are platform-independent, so one platform is enough to enforce them.
       - name: Check formatting and lint
         if: matrix.os == 'ubuntu-latest'
         run: npm run check

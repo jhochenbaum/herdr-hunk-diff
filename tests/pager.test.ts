@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { delimiter, join, win32 } from "node:path";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, posix, win32 } from "node:path";
 import {
   installPager,
   looksLikePath,
@@ -15,8 +17,8 @@ function fakePath(...binaries: string[]): {
   isExecutable: (p: string) => boolean;
 } {
   const dirs = ["/usr/bin", "/opt/homebrew/bin"];
-  const real = new Set(binaries.flatMap((b) => dirs.map((d) => join(d, b))));
-  return { pathEnv: dirs.join(delimiter), isExecutable: (p) => real.has(p) };
+  const real = new Set(binaries.flatMap((b) => dirs.map((d) => posix.join(d, b))));
+  return { pathEnv: dirs.join(posix.delimiter), isExecutable: (p) => real.has(p) };
 }
 
 const present =
@@ -156,21 +158,40 @@ describe("looksLikePath", () => {
 });
 
 describe("realPagerEffects.canRun", () => {
-  const effects = () => realPagerEffects({ PATH: "/bin" }, () => ({ status: 0, stdout: "" }));
+  // A real file in a temp directory, rather than the host's own `/bin/sh`: what makes a file
+  // executable differs by platform — a mode bit on POSIX, an extension on Windows — so probing the
+  // system's own binaries would assert facts about the runner instead of about this code.
+  function probe(): { dir: string; command: string; file: string } {
+    const dir = mkdtempSync(join(tmpdir(), "pager-bin-"));
+    const command = "hunkprobe";
+    const windows = process.platform === "win32";
+    const file = join(dir, windows ? `${command}.cmd` : command);
+    writeFileSync(file, windows ? "@echo off\r\n" : "#!/bin/sh\n");
+    if (!windows) chmodSync(file, 0o755);
+    return { dir, command, file };
+  }
+
+  const effects = (dir: string) =>
+    realPagerEffects({ PATH: dir, PATHEXT: ".COM;.EXE;.BAT;.CMD" }, () => ({
+      status: 0,
+      stdout: "",
+    }));
 
   it("finds a bare command on PATH", () => {
-    expect(effects().canRun("sh")).toBe(true);
-    expect(effects().canRun("definitely-not-a-real-binary-xyz")).toBe(false);
+    const { dir, command } = probe();
+    expect(effects(dir).canRun(command)).toBe(true);
+    expect(effects(dir).canRun("definitely-not-a-real-binary-xyz")).toBe(false);
   });
 
   it("checks a path where it points rather than on PATH", () => {
-    expect(effects().canRun("/bin/sh")).toBe(true);
-    expect(effects().canRun("/usr/bin/env")).toBe(true);
-    expect(effects().canRun("/bin/definitely-not-a-real-binary-xyz")).toBe(false);
+    const { dir, file } = probe();
+    expect(effects(dir).canRun(file)).toBe(true);
+    expect(effects(dir).canRun(join(dir, "definitely-not-a-real-binary-xyz"))).toBe(false);
   });
 
   it("does not accept a directory", () => {
-    expect(effects().canRun("/tmp/")).toBe(false);
+    const { dir } = probe();
+    expect(effects(dir).canRun(dir)).toBe(false);
   });
 });
 

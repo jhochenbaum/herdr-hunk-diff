@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { paneEntrypointFor } from "../src/actions.js";
 import { DEFAULTS } from "../src/config.js";
 import { DEFAULT_BINDINGS } from "../src/keys.js";
 import { dispatch } from "../src/runtime.js";
@@ -75,7 +76,7 @@ describe("reuse_pane", () => {
       expect(await dispatch("review", rt as any)).toBe(0);
       expect(rt.hunk.reload).toHaveBeenCalledOnce();
       expect(rt.herdr.openPane).toHaveBeenCalledWith({
-        entrypoint: "review",
+        entrypoint: paneEntrypointFor("review"),
         cwd: "/wt/x",
         placement: "split",
       });
@@ -463,12 +464,19 @@ describe("a failure with nothing on screen must exit non-zero and say why", () =
 describe("setup-keys reporting", () => {
   function homeWithConfig(text: string): string {
     const fakeHome = mkdtempSync(join(tmpdir(), "hunkdiff-home-"));
-    mkdirSync(join(fakeHome, ".config", "herdr"), { recursive: true });
-    writeFileSync(join(fakeHome, ".config", "herdr", "config.toml"), text);
+    const path = defaultConfigPath(fakeHome);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text);
     return fakeHome;
   }
 
-  const CONFIG_ENV = ["HOME", "HERDR_CONFIG_PATH", "XDG_CONFIG_HOME"] as const;
+  /**
+   * The default config location differs by platform, and so does the variable that redirects it:
+   * `homedir()` ignores HOME on Windows, where herdr reads `%APPDATA%`. Redirecting the wrong one
+   * does not fail — it lets these tests install keybindings into the real user config.
+   */
+  const WINDOWS = process.platform === "win32";
+  const CONFIG_ENV = ["HOME", "APPDATA", "HERDR_CONFIG_PATH", "XDG_CONFIG_HOME"] as const;
 
   async function dispatchWithEnv(
     action: string,
@@ -491,12 +499,15 @@ describe("setup-keys reporting", () => {
   }
 
   const dispatchWithHome = (fakeHome: string, rt: Record<string, any>) =>
-    dispatchWithEnv("setup-keys", { HOME: fakeHome }, rt);
+    dispatchWithEnv("setup-keys", WINDOWS ? { APPDATA: fakeHome } : { HOME: fakeHome }, rt);
 
   const userBinding = (key: string) =>
     `[[keys.command]]\nkey = "${key}"\ntype = "shell"\ncommand = "mine"\n`;
 
-  const defaultConfigPath = (fakeHome: string) => join(fakeHome, ".config", "herdr", "config.toml");
+  const defaultConfigPath = (fakeHome: string) =>
+    WINDOWS
+      ? join(fakeHome, "herdr", "config.toml")
+      : join(fakeHome, ".config", "herdr", "config.toml");
 
   function overrideConfig(text: string): string {
     const path = join(mkdtempSync(join(tmpdir(), "hunkdiff-override-")), "elsewhere.toml");
@@ -511,7 +522,7 @@ describe("setup-keys reporting", () => {
 
     const code = await dispatchWithEnv(
       "setup-keys",
-      { HOME: fakeHome, HERDR_CONFIG_PATH: override },
+      { ...(WINDOWS ? { APPDATA: fakeHome } : { HOME: fakeHome }), HERDR_CONFIG_PATH: override },
       rt,
     );
 
@@ -530,7 +541,7 @@ describe("setup-keys reporting", () => {
 
     const code = await dispatchWithEnv(
       "setup-keys",
-      { HOME: fakeHome, HERDR_CONFIG_PATH: override },
+      { ...(WINDOWS ? { APPDATA: fakeHome } : { HOME: fakeHome }), HERDR_CONFIG_PATH: override },
       rt,
     );
 
@@ -544,13 +555,17 @@ describe("setup-keys reporting", () => {
     const fakeHome = homeWithConfig(original);
     const override = overrideConfig(original);
 
-    await dispatchWithEnv("setup-keys", { HOME: fakeHome, HERDR_CONFIG_PATH: override }, runtime());
+    await dispatchWithEnv(
+      "setup-keys",
+      { ...(WINDOWS ? { APPDATA: fakeHome } : { HOME: fakeHome }), HERDR_CONFIG_PATH: override },
+      runtime(),
+    );
     expect(readFileSync(override, "utf8")).toContain("BEGIN jhochenbaum.hunkdiff");
 
     const rt = runtime();
     const code = await dispatchWithEnv(
       "remove-keys",
-      { HOME: fakeHome, HERDR_CONFIG_PATH: override },
+      { ...(WINDOWS ? { APPDATA: fakeHome } : { HOME: fakeHome }), HERDR_CONFIG_PATH: override },
       rt,
     );
 

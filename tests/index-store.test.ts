@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } fro
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ReviewIndex } from "../src/index-store.js";
+import { worktreeKey } from "../src/worktree.js";
 
 const dir = () => mkdtempSync(join(tmpdir(), "hunkidx-"));
 
@@ -71,7 +72,8 @@ describe("ReviewIndex", () => {
     const d = dir();
     writeFileSync(
       join(d, "review-index.json"),
-      JSON.stringify({ "/wt/x": { worktree: "/wt/x", sent: [null, "c1"] } }),
+      // Keyed the way the store writes it: entries are addressed by worktree identity.
+      JSON.stringify({ [worktreeKey("/wt/x")]: { worktree: "/wt/x", sent: [null, "c1"] } }),
     );
     const idx = new ReviewIndex(d);
     expect(idx.sentIds("/wt/x")).toEqual(["c1"]);
@@ -90,7 +92,7 @@ describe("ReviewIndex", () => {
     const d = dir();
     writeFileSync(
       join(d, "review-index.json"),
-      JSON.stringify({ "/wt/x": { worktree: "/wt/x", sent: "abc" } }),
+      JSON.stringify({ [worktreeKey("/wt/x")]: { worktree: "/wt/x", sent: "abc" } }),
     );
     expect(new ReviewIndex(d).sentIds("/wt/x")).toEqual([]);
   });

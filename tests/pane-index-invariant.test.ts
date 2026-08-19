@@ -14,6 +14,7 @@ import { canReload } from "../src/hunk.js";
 import { ReviewIndex, type ReviewEntry } from "../src/index-store.js";
 import { dispatch } from "../src/runtime.js";
 import { resolveTarget, type Target } from "../src/target.js";
+import { worktreeKey } from "../src/worktree.js";
 
 const WT = "/wt/x";
 const SHA = "aaaaaaa";
@@ -53,6 +54,14 @@ function onDisk(dir: string): Record<string, ReviewEntry> {
   }
 }
 
+/**
+ * The index file is keyed by `worktreeKey`, not by the path a caller holds, so a snapshot taken at
+ * spawn time has to be read the same way the store writes it.
+ */
+function entryAt(index: Record<string, ReviewEntry>, worktree: string): ReviewEntry | undefined {
+  return index[worktreeKey(worktree)];
+}
+
 interface Spawn {
   entrypoint: string;
   index: Record<string, ReviewEntry>;
@@ -63,7 +72,7 @@ function paneDisplays(cfg: PluginConfig, spawn: Spawn): Target {
   if (!actionId) throw new Error(`No review action maps to pane entrypoint "${spawn.entrypoint}"`);
   const target = resolve(cfg, requestedMode(actionId));
   if (!reviewRequestFor(actionId).takesRef) return target;
-  const record = spawn.index[WT];
+  const record = entryAt(spawn.index, WT);
   if (!target.ref && record?.requestedRef) return { ...target, ref: record.requestedRef };
   return target;
 }
@@ -200,7 +209,7 @@ describe.each(CONFIGS)("a freshly opened review pane (%s)", (_label, cfg) => {
     );
     expectIndexDescribes(
       cfg,
-      h.spawns[0].index[WT],
+      entryAt(h.spawns[0].index, WT),
       displayed,
       `${id} as openPane spawned the pane`,
     );
@@ -236,7 +245,7 @@ describe.each(CONFIGS)(
       for (const spawn of h.spawns) {
         expectIndexDescribes(
           cfg,
-          spawn.index[WT],
+          entryAt(spawn.index, WT),
           paneDisplays(cfg, spawn),
           `${id} as openPane spawned the pane`,
         );
@@ -327,7 +336,7 @@ describe("the event hook's auto-open", () => {
     const d = hook(DEFAULTS, { dir: seed.dir, index: seed.index });
     await d.fire();
 
-    expect(d.spawns[0].index[WT]?.requestedMode).toBe("staged");
+    expect(entryAt(d.spawns[0].index, WT)?.requestedMode).toBe("staged");
     expect(seed.index.get(WT)?.requestedMode).toBeUndefined();
   });
 
