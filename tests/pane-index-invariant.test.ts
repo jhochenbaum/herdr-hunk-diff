@@ -322,7 +322,7 @@ describe("the event hook's auto-open", () => {
       await d.fire();
 
       expect(d.spawns).toHaveLength(1);
-      expect(d.spawns[0].entrypoint).toBe("review");
+      expect(d.spawns[0].entrypoint).toBe(paneEntrypointFor("review"));
       const displayed = paneDisplays(cfg, d.spawns[0]);
       expect(displayed).toEqual(resolve(cfg));
       expectIndexDescribes(cfg, seed.index.get(WT), displayed, "event-hook auto-open, afterwards");
