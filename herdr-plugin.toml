@@ -15,24 +15,24 @@ command = ["npm", "ci"]
 command = ["npm", "run", "build"]
 
 # Global socket subscriptions require a pane id, so each event runs a short-lived manifest hook.
-# Hook cwd is unspecified; resolve the entrypoint from the plugin root.
+# Herdr runs hooks from the plugin root, so direct argv needs no shell expansion.
 [[events]]
 on = "pane.agent_status_changed"
-command = ["sh", "-c", "exec node \"${HERDR_PLUGIN_ROOT:-.}/dist/bin/event.js\""]
+command = ["node", "dist/bin/event.js"]
 
 [[events]]
 on = "pane.exited"
-command = ["sh", "-c", "exec node \"${HERDR_PLUGIN_ROOT:-.}/dist/bin/event.js\""]
+command = ["node", "dist/bin/event.js"]
 
 [[events]]
 on = "pane.closed"
-command = ["sh", "-c", "exec node \"${HERDR_PLUGIN_ROOT:-.}/dist/bin/event.js\""]
+command = ["node", "dist/bin/event.js"]
 
 [[events]]
 on = "worktree.removed"
-command = ["sh", "-c", "exec node \"${HERDR_PLUGIN_ROOT:-.}/dist/bin/event.js\""]
+command = ["node", "dist/bin/event.js"]
 
-# The pane runs from the reviewed worktree. Its trailing action id carries mode across processes.
+# Panes run from the reviewed worktree, so use HERDR_PLUGIN_ROOT; the final argument selects mode.
 [[panes]]
 id = "review"
 title = "hunk review"

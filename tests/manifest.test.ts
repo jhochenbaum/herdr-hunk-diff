@@ -139,6 +139,17 @@ describe("herdr-plugin.toml", () => {
       for (const command of commands()) expect(command).toContain("dist/bin/event.js");
     });
 
+    it("runs every hook as direct argv, without a shell", () => {
+      for (const event of manifest.events) {
+        expect(event.command[0]).toBe("node");
+        expect(event.command).toContain("dist/bin/event.js");
+        for (const word of event.command) {
+          expect(word).not.toMatch(/^(sh|bash|zsh|cmd|cmd\.exe|powershell)$/);
+          expect(word).not.toContain("${");
+        }
+      }
+    });
+
     it("filters no hook by pane id, since none of these types requires one", () => {
       for (const event of manifest.events) expect(event.pane_id).toBeUndefined();
     });
