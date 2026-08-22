@@ -72,7 +72,7 @@ describe("isReviewAction", () => {
 
 describe("paneEntrypointFor", () => {
   it("gives each review action its own pane entrypoint", () => {
-    const entrypoints = REVIEW_ACTIONS.map(paneEntrypointFor);
+    const entrypoints = REVIEW_ACTIONS.map((id) => paneEntrypointFor(id, "darwin"));
     expect(entrypoints).toEqual([
       "review",
       "review-staged",
@@ -81,6 +81,22 @@ describe("paneEntrypointFor", () => {
       "review-stash",
     ]);
     expect(new Set(entrypoints).size).toBe(entrypoints.length);
+  });
+
+  it("selects the windows twin of each entrypoint on win32", () => {
+    expect(REVIEW_ACTIONS.map((id) => paneEntrypointFor(id, "win32"))).toEqual([
+      "review-windows",
+      "review-staged-windows",
+      "review-branch-windows",
+      "review-commit-windows",
+      "review-stash-windows",
+    ]);
+  });
+
+  it("keeps the posix entrypoint on every platform that has a shell for it", () => {
+    for (const platform of ["darwin", "linux", "freebsd"] as NodeJS.Platform[]) {
+      expect(paneEntrypointFor("review", platform)).toBe("review");
+    }
   });
 
   it("throws rather than inventing an entrypoint for an id it does not know", () => {

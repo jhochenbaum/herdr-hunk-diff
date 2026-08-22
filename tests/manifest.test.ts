@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { parse } from "smol-toml";
-import { paneEntrypointFor, REVIEW_ACTIONS, type ReviewActionId } from "../src/actions.js";
+import {
+  paneEntrypointFor,
+  REVIEW_ACTIONS,
+  WINDOWS_PANE_SUFFIX,
+  type ReviewActionId,
+} from "../src/actions.js";
 import { HOOKED_EVENTS } from "../src/events.js";
 
 const manifest = parse(readFileSync("herdr-plugin.toml", "utf8")) as any;
@@ -12,8 +17,14 @@ describe("herdr-plugin.toml", () => {
     expect(manifest.min_herdr_version).toBe("0.8.0");
   });
 
-  it("targets macos and linux for v1", () => {
-    expect(manifest.platforms.sort()).toEqual(["linux", "macos"]);
+  it("targets macos, linux and windows", () => {
+    expect(manifest.platforms.sort()).toEqual(["linux", "macos", "windows"]);
+  });
+
+  it("builds on every platform it claims", () => {
+    for (const step of manifest.build) {
+      expect(step.platforms ?? manifest.platforms).toEqual(manifest.platforms);
+    }
   });
 
   it("uses no dots in action ids", () => {
@@ -102,28 +113,52 @@ describe("herdr-plugin.toml", () => {
   describe("review pane entrypoints", () => {
     const supported = [...REVIEW_ACTIONS] as ReviewActionId[];
 
-    it("declares a pane for every supported review action", () => {
-      for (const id of supported) {
-        const entrypoint = paneEntrypointFor(id);
-        expect(
-          manifest.panes.some((p: any) => p.id === entrypoint),
-          `no [[panes]] entry with id "${entrypoint}" for action "${id}"`,
-        ).toBe(true);
+    const platforms: NodeJS.Platform[] = ["darwin", "linux", "win32"];
+    const entrypoints = () =>
+      platforms.flatMap((platform) => supported.map((id) => paneEntrypointFor(id, platform)));
+
+    it("declares a pane for every supported review action, on every platform", () => {
+      for (const platform of platforms) {
+        for (const id of supported) {
+          const entrypoint = paneEntrypointFor(id, platform);
+          expect(
+            manifest.panes.some((p: any) => p.id === entrypoint),
+            `no [[panes]] entry with id "${entrypoint}" for action "${id}" on ${platform}`,
+          ).toBe(true);
+        }
       }
     });
 
     it("passes each action's own id as the pane command's trailing argument", () => {
-      for (const id of supported) {
-        const pane = manifest.panes.find((p: any) => p.id === paneEntrypointFor(id));
-        expect(pane.command.at(-1).trim().endsWith(` ${id}`)).toBe(true);
+      for (const platform of platforms) {
+        for (const id of supported) {
+          const pane = manifest.panes.find((p: any) => p.id === paneEntrypointFor(id, platform));
+          expect(pane.command.at(-1).trim().endsWith(` ${id}`)).toBe(true);
+        }
       }
     });
 
     it("declares exactly the panes the review actions open, and no others", () => {
       expect(manifest.panes.map((p: any) => p.id).sort()).toEqual(
-        supported.map(paneEntrypointFor).sort(),
+        [...new Set(entrypoints())].sort(),
       );
-      expect(manifest.panes).toHaveLength(supported.length);
+    });
+
+    it("pairs each pane's declared platforms with a shell those platforms have", () => {
+      for (const pane of manifest.panes) {
+        const windows = pane.id.endsWith(WINDOWS_PANE_SUFFIX);
+        expect(pane.platforms).toEqual(windows ? ["windows"] : ["macos", "linux"]);
+        expect(pane.command[0]).toBe(windows ? "cmd" : "sh");
+      }
+    });
+
+    it("expands the plugin root with the syntax each pane's own shell understands", () => {
+      for (const pane of manifest.panes) {
+        const command = pane.command.join(" ");
+        expect(command).toContain(
+          pane.id.endsWith(WINDOWS_PANE_SUFFIX) ? "%HERDR_PLUGIN_ROOT%" : "$HERDR_PLUGIN_ROOT",
+        );
+      }
     });
   });
 

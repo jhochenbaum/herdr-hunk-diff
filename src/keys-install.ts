@@ -1,6 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, posix, win32 } from "node:path";
 import {
   buildKeysBlock,
   ConfigParseError,
@@ -19,16 +19,28 @@ export interface Result {
   skipped?: Binding[];
 }
 
-/**
- * Mirrors Herdr's config precedence. `HERDR_CONFIG_PATH` is a literal file path, including an empty
- * value; otherwise XDG config wins over `~/.config`.
- */
-export function resolveHerdrConfigPath(env: NodeJS.ProcessEnv): string {
+/** Mirrors Herdr v0.8: explicit path, XDG, then platform-specific fallbacks. */
+export function resolveHerdrConfigPath(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform,
+): string {
   const override = env.HERDR_CONFIG_PATH;
   if (override !== undefined) return override;
+
+  const join = platform === "win32" ? win32.join : posix.join;
   const xdg = env.XDG_CONFIG_HOME;
   if (xdg !== undefined) return join(xdg, "herdr", "config.toml");
-  return join(homedir(), ".config", "herdr", "config.toml");
+
+  if (platform === "win32") {
+    if (env.APPDATA !== undefined) return join(env.APPDATA, "herdr", "config.toml");
+    if (env.USERPROFILE !== undefined)
+      return join(env.USERPROFILE, "AppData", "Roaming", "herdr", "config.toml");
+    if (env.HOME !== undefined) return join(env.HOME, ".config", "herdr", "config.toml");
+    return join(tmpdir(), "herdr", "config.toml");
+  }
+
+  const configHome = env.HOME !== undefined ? join(env.HOME, ".config") : tmpdir();
+  return join(configHome, "herdr", "config.toml");
 }
 
 function noConfigPath(): Result {
@@ -118,8 +130,8 @@ export function installKeys(configPath: string, bindings: Binding[]): Result {
       ok: true,
       message:
         skipped.length === 0
-          ? `Installed ${installable.length} keybinding(s). ${reload}`
-          : `Installed ${installable.length} of ${bindings.length} keybinding(s). Skipped ` +
+          ? `Installed ${installable.length} keybinding(s) in ${configPath}. ${reload}`
+          : `Installed ${installable.length} of ${bindings.length} keybinding(s) in ${configPath}. Skipped ` +
             `${describe(skipped)} — already bound in your herdr config, and left untouched. ` +
             `Bind those actions to keys of your own if you want them. ${reload}`,
       backup: saved,

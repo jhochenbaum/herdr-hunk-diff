@@ -43,8 +43,14 @@ const PANE_ENTRYPOINTS: Record<string, string> = {
   "review:stash": "review-stash",
 };
 
-export function paneEntrypointFor(id: ReviewActionId): string {
+/** Selects the cmd-based manifest entry for a Windows pane. */
+export const WINDOWS_PANE_SUFFIX = "-windows";
+
+export function paneEntrypointFor(
+  id: ReviewActionId,
+  platform: NodeJS.Platform = process.platform,
+): string {
   const entrypoint = PANE_ENTRYPOINTS[id];
   if (!entrypoint) throw new Error(`No review pane entrypoint for action "${id}"`);
-  return entrypoint;
+  return platform === "win32" ? `${entrypoint}${WINDOWS_PANE_SUFFIX}` : entrypoint;
 }

@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { paneEntrypointFor } from "../src/actions.js";
 import { DEFAULTS } from "../src/config.js";
 import { dispatch } from "../src/runtime.js";
 import { ReviewIndex } from "../src/index-store.js";
+import { worktreeKey } from "../src/worktree.js";
 
 function runtime(over: Record<string, any> = {}) {
   const requests: Array<{ mode?: string; ref?: string }> = [];
@@ -69,7 +71,7 @@ describe("requested review mode reaches target resolution", () => {
     await dispatch("review:stash", rt as any);
     expect(rt.hunk.reload).not.toHaveBeenCalled();
     expect(rt.herdr.openPane).toHaveBeenCalledWith({
-      entrypoint: "review-stash",
+      entrypoint: paneEntrypointFor("review:stash"),
       cwd: "/wt/x",
       placement: "split",
     });
@@ -286,7 +288,7 @@ describe("what the pane process reads from the index at launch", () => {
     });
     expect(await dispatch("review:commit", rt as any)).toBe(0);
     expect(observed).toHaveLength(1);
-    expect(observed[0]["/wt/x"]?.requestedRef).toBe("abc1234def");
+    expect(observed[0][worktreeKey("/wt/x")]?.requestedRef).toBe("abc1234def");
   });
 
   it("sees no ref at all when this invocation has none, rather than the previous review's", async () => {

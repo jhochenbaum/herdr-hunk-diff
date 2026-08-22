@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { delimiter, join } from "node:path";
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, posix, win32 } from "node:path";
 import {
   installPager,
+  looksLikePath,
   MANUAL_PAGER_SETUP,
   onPath,
   realPagerEffects,
@@ -14,8 +17,8 @@ function fakePath(...binaries: string[]): {
   isExecutable: (p: string) => boolean;
 } {
   const dirs = ["/usr/bin", "/opt/homebrew/bin"];
-  const real = new Set(binaries.flatMap((b) => dirs.map((d) => join(d, b))));
-  return { pathEnv: dirs.join(delimiter), isExecutable: (p) => real.has(p) };
+  const real = new Set(binaries.flatMap((b) => dirs.map((d) => posix.join(d, b))));
+  return { pathEnv: dirs.join(posix.delimiter), isExecutable: (p) => real.has(p) };
 }
 
 const present =
@@ -74,44 +77,136 @@ function fakeGitConfig(
 }
 
 describe("onPath", () => {
+  // Keep POSIX cases independent of the test host.
+  const POSIX: [string | undefined, NodeJS.Platform] = [undefined, "linux"];
+
   it("finds a binary that is executable in a PATH entry", () => {
     const { pathEnv, isExecutable } = fakePath("git");
-    expect(onPath("git", pathEnv, isExecutable)).toBe(true);
+    expect(onPath("git", pathEnv, isExecutable, ...POSIX)).toBe(true);
   });
 
   it("does not find a binary that is in no PATH entry", () => {
     const { pathEnv, isExecutable } = fakePath("git");
-    expect(onPath("jj", pathEnv, isExecutable)).toBe(false);
-    expect(onPath("sl", pathEnv, isExecutable)).toBe(false);
+    expect(onPath("jj", pathEnv, isExecutable, ...POSIX)).toBe(false);
+    expect(onPath("sl", pathEnv, isExecutable, ...POSIX)).toBe(false);
   });
 
   it("finds nothing when PATH is absent or empty", () => {
     const { isExecutable } = fakePath("git");
-    expect(onPath("git", undefined, isExecutable)).toBe(false);
-    expect(onPath("git", "", isExecutable)).toBe(false);
+    expect(onPath("git", undefined, isExecutable, ...POSIX)).toBe(false);
+    expect(onPath("git", "", isExecutable, ...POSIX)).toBe(false);
   });
 
   it("skips an empty PATH entry rather than resolving it relative to the cwd", () => {
-    expect(onPath("git", "/usr/bin:", (p) => p === "git" || p === join(".", "git"))).toBe(false);
+    expect(onPath("git", "/usr/bin:", (p) => p === "git" || p === join(".", "git"), ...POSIX)).toBe(
+      false,
+    );
+  });
+
+  describe("on windows", () => {
+    const PATHEXT = ".COM;.EXE;.BAT;.CMD";
+
+    it("finds git.exe when the search name is bare git", () => {
+      const isExecutable = (p: string) => p === "C:\\Program Files\\Git\\cmd\\git.exe";
+      expect(onPath("git", "C:\\Program Files\\Git\\cmd", isExecutable, PATHEXT, "win32")).toBe(
+        true,
+      );
+    });
+
+    it("finds a command shipped as a .cmd shim", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "hunk.cmd");
+      expect(onPath("hunk", "C:\\tools", isExecutable, PATHEXT, "win32")).toBe(true);
+    });
+
+    it("does not accept an extensionless file, which windows cannot execute", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "git");
+      expect(onPath("git", "C:\\tools", isExecutable, PATHEXT, "win32")).toBe(false);
+    });
+
+    it("honours a PATHEXT that omits an extension", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "hunk.cmd");
+      expect(onPath("hunk", "C:\\tools", isExecutable, ".EXE", "win32")).toBe(false);
+    });
+
+    it("falls back to the standard PATHEXT when the variable is unset", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "git.exe");
+      expect(onPath("git", "C:\\tools", isExecutable, undefined, "win32")).toBe(true);
+    });
+
+    it("searches a name that already carries an extension as given", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "git.exe");
+      expect(onPath("git.exe", "C:\\tools", isExecutable, PATHEXT, "win32")).toBe(true);
+    });
+
+    it("rejects a supplied extension that PATHEXT does not make executable", () => {
+      const isExecutable = (p: string) => p === win32.join("C:\\tools", "git.txt");
+      expect(onPath("git.txt", "C:\\tools", isExecutable, PATHEXT, "win32")).toBe(false);
+    });
+  });
+});
+
+describe("looksLikePath", () => {
+  it("treats a posix path as a path and a bare name as a command", () => {
+    expect(looksLikePath("/usr/local/bin/hunk", "linux")).toBe(true);
+    expect(looksLikePath("hunk", "linux")).toBe(false);
+  });
+
+  it("reads a backslash path as a path only on windows", () => {
+    expect(looksLikePath("C:\\tools\\hunk.exe", "win32")).toBe(true);
+    expect(looksLikePath("C:\\tools\\hunk.exe", "linux")).toBe(false);
   });
 });
 
 describe("realPagerEffects.canRun", () => {
-  const effects = () => realPagerEffects({ PATH: "/bin" }, () => ({ status: 0, stdout: "" }));
+  // Avoid assumptions about binaries installed on the test host.
+  function probe(): { dir: string; command: string; file: string } {
+    const dir = mkdtempSync(join(tmpdir(), "pager-bin-"));
+    const command = "hunkprobe";
+    const windows = process.platform === "win32";
+    const file = join(dir, windows ? `${command}.cmd` : command);
+    writeFileSync(file, windows ? "@echo off\r\n" : "#!/bin/sh\n");
+    if (!windows) chmodSync(file, 0o755);
+    return { dir, command, file };
+  }
+
+  const effects = (dir: string) =>
+    realPagerEffects({ PATH: dir, PATHEXT: ".COM;.EXE;.BAT;.CMD" }, () => ({
+      status: 0,
+      stdout: "",
+    }));
 
   it("finds a bare command on PATH", () => {
-    expect(effects().canRun("sh")).toBe(true);
-    expect(effects().canRun("definitely-not-a-real-binary-xyz")).toBe(false);
+    const { dir, command } = probe();
+    expect(effects(dir).canRun(command)).toBe(true);
+    expect(effects(dir).canRun("definitely-not-a-real-binary-xyz")).toBe(false);
   });
 
   it("checks a path where it points rather than on PATH", () => {
-    expect(effects().canRun("/bin/sh")).toBe(true);
-    expect(effects().canRun("/usr/bin/env")).toBe(true);
-    expect(effects().canRun("/bin/definitely-not-a-real-binary-xyz")).toBe(false);
+    const { dir, file } = probe();
+    expect(effects(dir).canRun(file)).toBe(true);
+    expect(effects(dir).canRun(join(dir, "definitely-not-a-real-binary-xyz"))).toBe(false);
   });
 
   it("does not accept a directory", () => {
-    expect(effects().canRun("/tmp/")).toBe(false);
+    const { dir } = probe();
+    expect(effects(dir).canRun(dir)).toBe(false);
+  });
+
+  it("accepts a direct Windows command path only when its extension is in PATHEXT", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pager-win-bin-"));
+    const command = join(dir, "hunk.cmd");
+    const text = join(dir, "hunk.txt");
+    const extensionless = join(dir, "hunk");
+    for (const file of [command, text, extensionless]) writeFileSync(file, "probe");
+
+    const windows = realPagerEffects(
+      { PATH: "", PATHEXT: ".EXE;.CMD" },
+      () => ({ status: 0, stdout: "" }),
+      "win32",
+    );
+    expect(windows.canRun(command)).toBe(true);
+    expect(windows.canRun(text)).toBe(false);
+    expect(windows.canRun(extensionless)).toBe(false);
   });
 });
 

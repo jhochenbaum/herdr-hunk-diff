@@ -3,12 +3,77 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } fro
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ReviewIndex } from "../src/index-store.js";
+import { worktreeKey } from "../src/worktree.js";
 
 const dir = () => mkdtempSync(join(tmpdir(), "hunkidx-"));
 
 describe("ReviewIndex", () => {
   it("returns undefined for an unknown worktree", () => {
     expect(new ReviewIndex(dir()).get("/wt/x")).toBeUndefined();
+  });
+
+  describe("Windows worktree identity", () => {
+    it("recovers a unique stored alias after the worktree disappears", () => {
+      let exists = true;
+      const realpath = () => {
+        if (!exists) throw new Error("ENOENT");
+        return "C:\\work\\Repo";
+      };
+      const index = new ReviewIndex(dir(), { platform: "win32", realpath });
+      index.upsert({ worktree: "C:\\WORK\\REPO", agentName: "reviewer", sent: ["c1"] });
+
+      exists = false;
+      expect(index.get("c:\\work\\repo")?.agentName).toBe("reviewer");
+      expect(index.sentIds("c:\\work\\repo")).toEqual(["c1"]);
+      index.remove("c:\\work\\repo");
+      expect(index.all()).toEqual([]);
+    });
+
+    it("does not guess between case-distinct repositories when a missing alias is ambiguous", () => {
+      let exists = true;
+      const realpath = (path: string) => {
+        if (!exists) throw new Error("ENOENT");
+        return path;
+      };
+      const index = new ReviewIndex(dir(), { platform: "win32", realpath });
+      index.upsert({ worktree: "C:\\work\\Repo", agentName: "upper", sent: [] });
+      index.upsert({ worktree: "C:\\work\\repo", agentName: "lower", sent: [] });
+
+      exists = false;
+      expect(index.get("C:\\work\\REPO")).toBeUndefined();
+      index.remove("C:\\work\\REPO");
+      expect(
+        index
+          .all()
+          .map((entry) => entry.agentName)
+          .sort(),
+      ).toEqual(["lower", "upper"]);
+    });
+  });
+
+  it("finds an entry through another spelling of the same path", () => {
+    const d = dir();
+    new ReviewIndex(d).upsert({ worktree: "/wt/x", agentName: "reviewer", sent: [] });
+    expect(new ReviewIndex(d).get("/wt/x/")?.agentName).toBe("reviewer");
+  });
+
+  it("merges into the existing entry rather than adding a second one", () => {
+    const d = dir();
+    const index = new ReviewIndex(d);
+    index.upsert({ worktree: "/wt/x", agentName: "reviewer", sent: ["a"] });
+    index.upsert({ worktree: "/wt/x/", paneId: "w1:p2", sent: ["b"] });
+
+    expect(index.all()).toHaveLength(1);
+    expect(index.get("/wt/x")).toMatchObject({ agentName: "reviewer", paneId: "w1:p2" });
+    expect(index.sentIds("/wt/x")).toEqual(["a", "b"]);
+  });
+
+  it("removes an entry addressed by another spelling of its path", () => {
+    const d = dir();
+    const index = new ReviewIndex(d);
+    index.upsert({ worktree: "/wt/x", sent: [] });
+    index.remove("/wt/x/");
+    expect(index.get("/wt/x")).toBeUndefined();
   });
 
   it("persists an entry across instances", () => {
@@ -43,7 +108,7 @@ describe("ReviewIndex", () => {
     const d = dir();
     writeFileSync(
       join(d, "review-index.json"),
-      JSON.stringify({ "/wt/x": { worktree: "/wt/x", sent: [null, "c1"] } }),
+      JSON.stringify({ [worktreeKey("/wt/x")]: { worktree: "/wt/x", sent: [null, "c1"] } }),
     );
     const idx = new ReviewIndex(d);
     expect(idx.sentIds("/wt/x")).toEqual(["c1"]);
@@ -62,7 +127,7 @@ describe("ReviewIndex", () => {
     const d = dir();
     writeFileSync(
       join(d, "review-index.json"),
-      JSON.stringify({ "/wt/x": { worktree: "/wt/x", sent: "abc" } }),
+      JSON.stringify({ [worktreeKey("/wt/x")]: { worktree: "/wt/x", sent: "abc" } }),
     );
     expect(new ReviewIndex(d).sentIds("/wt/x")).toEqual([]);
   });

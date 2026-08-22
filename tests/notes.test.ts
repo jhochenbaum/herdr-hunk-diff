@@ -98,4 +98,9 @@ describe("sidecarPath", () => {
     const d = dir();
     expect(sidecarPath(d, "/wt/a")).not.toBe(sidecarPath(d, "/wt/b"));
   });
+
+  it("addresses one file for either spelling of the same worktree", () => {
+    const d = dir();
+    expect(sidecarPath(d, "/wt/a/")).toBe(sidecarPath(d, "/wt/a"));
+  });
 });

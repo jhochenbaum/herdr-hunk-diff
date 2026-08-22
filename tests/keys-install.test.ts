@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { join, posix, win32 } from "node:path";
 import { DEFAULT_BINDINGS, buildKeysBlock } from "../src/keys.js";
 import { installKeys, removeKeys, resolveHerdrConfigPath } from "../src/keys-install.js";
 
@@ -25,10 +25,15 @@ function timesBound(path: string, action: string): number {
 const isRoot = typeof process.getuid === "function" && process.getuid() === 0;
 
 describe("resolveHerdrConfigPath", () => {
-  const DEFAULT = join(homedir(), ".config", "herdr", "config.toml");
+  const HOME = "/Users/example";
+  const DEFAULT = posix.join(HOME, ".config", "herdr", "config.toml");
 
-  it("falls back to ~/.config/herdr/config.toml when nothing overrides it", () => {
-    expect(resolveHerdrConfigPath({})).toBe(DEFAULT);
+  it("falls back to $HOME/.config/herdr/config.toml when nothing overrides it", () => {
+    expect(resolveHerdrConfigPath({ HOME }, "darwin")).toBe(DEFAULT);
+  });
+
+  it("uses the temporary directory when HOME is unavailable, as Herdr does", () => {
+    expect(resolveHerdrConfigPath({}, "linux")).toBe(posix.join(tmpdir(), "herdr", "config.toml"));
   });
 
   it("uses HERDR_CONFIG_PATH when it is set", () => {
@@ -52,7 +57,9 @@ describe("resolveHerdrConfigPath", () => {
   });
 
   it("reads $XDG_CONFIG_HOME/herdr/config.toml when HERDR_CONFIG_PATH is unset", () => {
-    expect(resolveHerdrConfigPath({ XDG_CONFIG_HOME: "/b" })).toBe("/b/herdr/config.toml");
+    expect(resolveHerdrConfigPath({ XDG_CONFIG_HOME: "/b" }, "linux")).toBe(
+      posix.join("/b", "herdr", "config.toml"),
+    );
   });
 
   it("returns a path that does not exist yet, and setup-keys creates it there", () => {
@@ -79,6 +86,52 @@ describe("resolveHerdrConfigPath", () => {
     const res = removeKeys("");
     expect(res.ok).toBe(false);
     expect(res.message).toContain("HERDR_CONFIG_PATH");
+  });
+
+  describe("on windows", () => {
+    it("reads %APPDATA%/herdr/config.toml", () => {
+      expect(resolveHerdrConfigPath({ APPDATA: "C:\\Users\\x\\AppData\\Roaming" }, "win32")).toBe(
+        win32.join("C:\\Users\\x\\AppData\\Roaming", "herdr", "config.toml"),
+      );
+    });
+
+    it("prefers XDG_CONFIG_HOME over APPDATA", () => {
+      const path = resolveHerdrConfigPath(
+        { APPDATA: "C:\\Users\\x\\AppData\\Roaming", XDG_CONFIG_HOME: "C:\\xdg" },
+        "win32",
+      );
+      expect(path).toBe(win32.join("C:\\xdg", "herdr", "config.toml"));
+    });
+
+    it("still honours an explicit HERDR_CONFIG_PATH", () => {
+      expect(
+        resolveHerdrConfigPath(
+          { APPDATA: "C:\\Roaming", HERDR_CONFIG_PATH: "D:\\mine.toml" },
+          "win32",
+        ),
+      ).toBe("D:\\mine.toml");
+    });
+
+    it("falls back through USERPROFILE and then HOME", () => {
+      expect(resolveHerdrConfigPath({ USERPROFILE: "C:\\Users\\x" }, "win32")).toBe(
+        win32.join("C:\\Users\\x", "AppData", "Roaming", "herdr", "config.toml"),
+      );
+      expect(resolveHerdrConfigPath({ HOME: "C:\\Users\\x" }, "win32")).toBe(
+        win32.join("C:\\Users\\x", ".config", "herdr", "config.toml"),
+      );
+    });
+
+    it("uses the temporary directory when no profile variables exist", () => {
+      expect(resolveHerdrConfigPath({}, "win32")).toBe(
+        win32.join(tmpdir(), "herdr", "config.toml"),
+      );
+    });
+
+    it("treats an empty APPDATA as set, matching Herdr's environment lookup", () => {
+      expect(resolveHerdrConfigPath({ APPDATA: "" }, "win32")).toBe(
+        win32.join("herdr", "config.toml"),
+      );
+    });
   });
 });
 

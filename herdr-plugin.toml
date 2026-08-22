@@ -5,9 +5,9 @@ version = "0.1.0"
 # Requires plugin-root-relative action commands and reliable agent prompt submission from Herdr 0.8.
 min_herdr_version = "0.8.0"
 description = "Review agent-authored diffs in hunk, and send your inline comments back to the agent that wrote them."
-platforms = ["macos", "linux"]
+platforms = ["macos", "linux", "windows"]
 
-# Remote installs fetch dependencies and compile; `plugin link` users build locally.
+# Build steps inherit the top-level platforms.
 [[build]]
 command = ["npm", "ci"]
 
@@ -32,36 +32,77 @@ command = ["node", "dist/bin/event.js"]
 on = "worktree.removed"
 command = ["node", "dist/bin/event.js"]
 
-# Panes run from the reviewed worktree, so use HERDR_PLUGIN_ROOT; the final argument selects mode.
+# Panes run from the reviewed worktree, so a platform shell expands HERDR_PLUGIN_ROOT.
+# Herdr requires unique pane ids; each mode therefore has POSIX and Windows entries.
 [[panes]]
 id = "review"
 title = "hunk review"
 placement = "split"
+platforms = ["macos", "linux"]
 command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/pane.js\" review"]
+
+[[panes]]
+id = "review-windows"
+title = "hunk review"
+placement = "split"
+platforms = ["windows"]
+command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\pane.js\" review"]
 
 [[panes]]
 id = "review-staged"
 title = "hunk review (staged)"
 placement = "split"
+platforms = ["macos", "linux"]
 command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/pane.js\" review:staged"]
+
+[[panes]]
+id = "review-staged-windows"
+title = "hunk review (staged)"
+placement = "split"
+platforms = ["windows"]
+command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\pane.js\" review:staged"]
 
 [[panes]]
 id = "review-branch"
 title = "hunk review (branch)"
 placement = "split"
+platforms = ["macos", "linux"]
 command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/pane.js\" review:branch"]
+
+[[panes]]
+id = "review-branch-windows"
+title = "hunk review (branch)"
+placement = "split"
+platforms = ["windows"]
+command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\pane.js\" review:branch"]
 
 [[panes]]
 id = "review-commit"
 title = "hunk review (commit)"
 placement = "split"
+platforms = ["macos", "linux"]
 command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/pane.js\" review:commit"]
+
+[[panes]]
+id = "review-commit-windows"
+title = "hunk review (commit)"
+placement = "split"
+platforms = ["windows"]
+command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\pane.js\" review:commit"]
 
 [[panes]]
 id = "review-stash"
 title = "hunk review (stash)"
 placement = "split"
+platforms = ["macos", "linux"]
 command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/pane.js\" review:stash"]
+
+[[panes]]
+id = "review-stash-windows"
+title = "hunk review (stash)"
+placement = "split"
+platforms = ["windows"]
+command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\pane.js\" review:stash"]
 
 [[actions]]
 id = "review"

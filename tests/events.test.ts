@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { paneEntrypointFor } from "../src/actions.js";
 import { DEFAULTS } from "../src/config.js";
 import { HOOKED_EVENTS, handleEvent, parseEvent, worktreeForPaneVia } from "../src/events.js";
 import { ReviewIndex } from "../src/index-store.js";
@@ -124,7 +125,7 @@ describe("handleEvent: an agent reaching a reviewable state", () => {
     const d = deps({ cfg: { ...DEFAULTS, review: { ...DEFAULTS.review, auto_open: true } } });
     await fire(finishedEvent, d);
     expect(d.herdr.openPane).toHaveBeenCalledWith({
-      entrypoint: "review",
+      entrypoint: paneEntrypointFor("review"),
       cwd: "/wt/x",
       placement: "split",
       targetPane: "w1Y:p1",
@@ -159,7 +160,7 @@ describe("handleEvent: an agent reaching a reviewable state", () => {
       const d = autoOpenDeps();
       await fire(finishedEvent, d);
       expect(d.herdr.openPane).toHaveBeenCalledWith({
-        entrypoint: "review",
+        entrypoint: paneEntrypointFor("review"),
         cwd: "/wt/x",
         placement: "split",
         targetPane: "w1Y:p1",
@@ -186,7 +187,7 @@ describe("handleEvent: an agent reaching a reviewable state", () => {
       d.index.upsert({ worktree: "/wt/x", paneId: "w1:pDEAD", sent: ["c1"] });
       await fire(finishedEvent, d);
       expect(d.herdr.openPane).toHaveBeenCalledWith({
-        entrypoint: "review",
+        entrypoint: paneEntrypointFor("review"),
         cwd: "/wt/x",
         placement: "split",
         targetPane: "w1Y:p1",
@@ -470,7 +471,7 @@ describe("the event entrypoint", () => {
       { buildDeps: h.buildDeps },
     );
     expect(h.d.herdr.openPane).toHaveBeenCalledWith({
-      entrypoint: "review",
+      entrypoint: paneEntrypointFor("review"),
       cwd: "/wt/x",
       placement: "split",
       targetPane: "w1Y:p1",

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { paneEntrypointFor } from "../src/actions.js";
 import { DEFAULTS } from "../src/config.js";
 import { dispatch } from "../src/runtime.js";
 import { ReviewIndex } from "../src/index-store.js";
@@ -37,29 +38,26 @@ describe("dispatch", () => {
     const rt = runtime();
     expect(await dispatch("review", rt as any)).toBe(0);
     expect(rt.herdr.openPane).toHaveBeenCalledWith({
-      entrypoint: "review",
+      entrypoint: paneEntrypointFor("review"),
       cwd: "/wt/x",
       placement: "split",
     });
   });
 
-  it.each([
-    ["review", "review"],
-    ["review:staged", "review-staged"],
-    ["review:branch", "review-branch"],
-    ["review:commit", "review-commit"],
-    ["review:stash", "review-stash"],
-  ])("opens the %s action's own pane entrypoint (%s)", async (actionId, entrypoint) => {
-    const rt = runtime({ target: { worktree: "/wt/y", mode: "working" as const } });
-    expect(await dispatch(actionId, rt as any)).toBe(0);
-    expect(rt.herdr.openPane).toHaveBeenCalledWith({
-      entrypoint,
-      cwd: "/wt/y",
-      placement: "split",
-    });
-    expect(rt.index.get("/wt/y")?.agentName).toBe("reviewer");
-    expect(rt.index.get("/wt/y")?.paneId).toBe("w1:p7");
-  });
+  it.each(["review", "review:staged", "review:branch", "review:commit", "review:stash"] as const)(
+    "opens the %s action's own pane entrypoint",
+    async (actionId) => {
+      const rt = runtime({ target: { worktree: "/wt/y", mode: "working" as const } });
+      expect(await dispatch(actionId, rt as any)).toBe(0);
+      expect(rt.herdr.openPane).toHaveBeenCalledWith({
+        entrypoint: paneEntrypointFor(actionId),
+        cwd: "/wt/y",
+        placement: "split",
+      });
+      expect(rt.index.get("/wt/y")?.agentName).toBe("reviewer");
+      expect(rt.index.get("/wt/y")?.paneId).toBe("w1:p7");
+    },
+  );
 
   it("opens the review with the configured placement", async () => {
     const rt = runtime({
@@ -67,7 +65,7 @@ describe("dispatch", () => {
     });
     await dispatch("review", rt as any);
     expect(rt.herdr.openPane).toHaveBeenCalledWith({
-      entrypoint: "review",
+      entrypoint: paneEntrypointFor("review"),
       cwd: "/wt/x",
       placement: "zoomed",
     });

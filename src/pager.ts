@@ -1,5 +1,5 @@
 import { accessSync, constants, statSync } from "node:fs";
-import { delimiter, join } from "node:path";
+import { posix, win32 } from "node:path";
 import type { Runner } from "./git.js";
 
 /** Pager setup with injected effects because Git configuration is global user state. */
@@ -40,36 +40,81 @@ export interface PagerEffects {
   canRun: (nameOrPath: string) => boolean;
 }
 
+/** Target-platform path semantics, also used by host-independent tests. */
+function pathFor(platform: NodeJS.Platform): typeof posix {
+  return platform === "win32" ? win32 : posix;
+}
+
+function executableExtensions(pathExt: string | undefined): string[] {
+  return (pathExt ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .map((ext) => ext.trim().toLowerCase())
+    .filter((ext) => ext.startsWith("."));
+}
+
+/** A value naming a location on disk rather than a command to look up on PATH. */
+export function looksLikePath(
+  value: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return value.includes("/") || (platform === "win32" && value.includes("\\"));
+}
+
+/** Expands Windows commands using PATHEXT; POSIX names pass through unchanged. */
+export function executableNames(
+  name: string,
+  pathExt: string | undefined,
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  if (platform !== "win32") return [name];
+  const extensions = executableExtensions(pathExt);
+  const suppliedExtension = win32.extname(name).toLowerCase();
+  if (suppliedExtension !== "") return extensions.includes(suppliedExtension) ? [name] : [];
+  return extensions.map((ext) => `${name}${ext}`);
+}
+
 /** Searches PATH, excluding empty entries that would implicitly search the current worktree. */
 export function onPath(
   name: string,
   pathEnv: string | undefined,
   isExecutable: (path: string) => boolean,
+  pathExt: string | undefined = process.env.PATHEXT,
+  platform: NodeJS.Platform = process.platform,
 ): boolean {
   if (!pathEnv) return false;
+  const { delimiter, join: joinFor } = pathFor(platform);
+  const candidates = executableNames(name, pathExt, platform);
   return pathEnv
     .split(delimiter)
     .filter((dir) => dir.length > 0)
-    .some((dir) => isExecutable(join(dir, name)));
+    .some((dir) => candidates.some((candidate) => isExecutable(joinFor(dir, candidate))));
 }
 
-/** Real effects require an executable file; `X_OK` alone also accepts directories. */
-export function realPagerEffects(env: NodeJS.ProcessEnv, run: Runner): PagerEffects {
+/** Requires X_OK on POSIX or a PATHEXT extension on Windows. */
+export function realPagerEffects(
+  env: NodeJS.ProcessEnv,
+  run: Runner,
+  platform: NodeJS.Platform = process.platform,
+): PagerEffects {
   const isExecutable = (path: string) => {
     try {
       if (!statSync(path).isFile()) return false;
-      accessSync(path, constants.X_OK);
+      if (platform !== "win32") accessSync(path, constants.X_OK);
       return true;
     } catch {
       return false;
     }
   };
+  const search = (name: string) => onPath(name, env.PATH, isExecutable, env.PATHEXT, platform);
+  const runnablePath = (path: string) => {
+    if (!isExecutable(path)) return false;
+    if (platform !== "win32") return true;
+    return executableExtensions(env.PATHEXT).includes(win32.extname(path).toLowerCase());
+  };
   return {
-    present: (vcs) => onPath(vcs, env.PATH, isExecutable),
+    present: search,
     canRun: (nameOrPath) =>
-      nameOrPath.includes("/")
-        ? isExecutable(nameOrPath)
-        : onPath(nameOrPath, env.PATH, isExecutable),
+      looksLikePath(nameOrPath, platform) ? runnablePath(nameOrPath) : search(nameOrPath),
     git: run,
   };
 }
@@ -190,8 +235,8 @@ export function installPager(effects: PagerEffects, hunkBin = "auto"): PagerResu
 }
 
 /** Relative paths are unsafe in global config; bare command names are resolved through PATH. */
-function isRelativePath(bin: string): boolean {
-  return bin.includes("/") && !bin.startsWith("/");
+function isRelativePath(bin: string, platform: NodeJS.Platform = process.platform): boolean {
+  return looksLikePath(bin, platform) && !pathFor(platform).isAbsolute(bin);
 }
 
 function unrunnableHunk(hunkBin: string, bin: string, manualToo: boolean): string {

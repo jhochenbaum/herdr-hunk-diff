@@ -20,9 +20,23 @@ export function reportFailure(herdr: { notify: (message: string) => void }, mess
   return 1;
 }
 
-export function resolveHunkBin(cfg: PluginConfig, pluginRoot: string): string {
-  if (cfg.hunk.bin !== "auto") return cfg.hunk.bin;
-  return join(pluginRoot, "node_modules", ".bin", "hunk");
+/** Executable and arguments prepended to hunk's argv. */
+export interface HunkLauncher {
+  bin: string;
+  prefix: string[];
+}
+
+/** Runs the bundled launcher with Node, bypassing platform-specific npm shims. */
+export function resolveHunkLauncher(
+  cfg: PluginConfig,
+  pluginRoot: string,
+  execPath: string = process.execPath,
+): HunkLauncher {
+  if (cfg.hunk.bin !== "auto") return { bin: cfg.hunk.bin, prefix: [] };
+  return {
+    bin: execPath,
+    prefix: [join(pluginRoot, "node_modules", "hunkdiff", "bin", "hunk.cjs")],
+  };
 }
 
 export class HerdrAdapter {

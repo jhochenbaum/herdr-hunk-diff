@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { worktreeKey } from "./worktree.js";
 
 /** Write schema for `hunk session comment apply --stdin` and `--agent-context`. */
 export interface AgentNote {
@@ -14,7 +15,7 @@ export interface AgentNote {
 
 /** Derives a stable, worktree-specific sidecar path. */
 export function sidecarPath(stateDir: string, worktree: string): string {
-  const key = createHash("sha256").update(worktree).digest("hex").slice(0, 12);
+  const key = createHash("sha256").update(worktreeKey(worktree)).digest("hex").slice(0, 12);
   return join(stateDir, "notes", `${key}.json`);
 }
 

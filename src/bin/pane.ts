@@ -4,7 +4,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { isReviewAction, reviewRequestFor, type ReviewRequest } from "../actions.js";
 import { loadConfig } from "../config.js";
 import { readContext } from "../context.js";
-import { HerdrAdapter, resolveHunkBin } from "../herdr.js";
+import { HerdrAdapter, resolveHunkLauncher } from "../herdr.js";
 import { buildLaunchArgs } from "../hunk.js";
 import { ReviewIndex } from "../index-store.js";
 import { hasCommitsAhead, realRunner, repoRoot, resolveBaseRef } from "../git.js";
@@ -60,11 +60,15 @@ export function resolveAndRun(
     sidecar = undefined;
   }
 
-  const bin = resolveHunkBin(cfg, env.HERDR_PLUGIN_ROOT ?? cwd);
-  const result = spawn(bin, buildLaunchArgs(target, cfg, sidecar), {
-    stdio: "inherit",
-    cwd: target.worktree,
-  });
+  const launcher = resolveHunkLauncher(cfg, env.HERDR_PLUGIN_ROOT ?? cwd);
+  const result = spawn(
+    launcher.bin,
+    [...launcher.prefix, ...buildLaunchArgs(target, cfg, sidecar)],
+    {
+      stdio: "inherit",
+      cwd: target.worktree,
+    },
+  );
 
   // hunk's own stderr dies with the pane herdr closes on a non-zero exit, so report it out of band.
   if (result.status !== 0) {
