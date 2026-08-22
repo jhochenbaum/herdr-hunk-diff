@@ -35,7 +35,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "hunkdiff": "0.18.1",
+    "hunkdiff": "0.19.0",
     "smol-toml": "^1.8.0"
   },
   "devDependencies": {
