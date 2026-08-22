@@ -1,6 +1,6 @@
 id = "jhochenbaum.hunkdiff"
 name = "hunk"
-version = "0.1.0"
+version = "0.2.0"
 
 # Requires plugin-root-relative action commands and reliable agent prompt submission from Herdr 0.8.
 min_herdr_version = "0.8.0"
