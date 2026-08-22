@@ -1,6 +1,6 @@
 {
   "name": "herdr-hunk-diff",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A herdr plugin that reviews agent-authored diffs in hunk and sends your inline comments back to the agent that wrote them.",
   "license": "MIT",
   "author": "Jordan Hochenbaum",
