@@ -11,6 +11,9 @@ export const REVIEW_ACTIONS = [
 
 export type ReviewActionId = (typeof REVIEW_ACTIONS)[number];
 
+/** Opens the repository/base/agent picker instead of a review directly. */
+export const PICK_REVIEW_ACTION = "review:pick";
+
 export function isReviewAction(id: string): id is ReviewActionId {
   return (REVIEW_ACTIONS as readonly string[]).includes(id);
 }
@@ -45,6 +48,10 @@ const PANE_ENTRYPOINTS: Record<string, string> = {
 
 /** Selects the cmd-based manifest entry for a Windows pane. */
 export const WINDOWS_PANE_SUFFIX = "-windows";
+
+export function pickerEntrypointFor(platform: NodeJS.Platform = process.platform): string {
+  return platform === "win32" ? `review-picker${WINDOWS_PANE_SUFFIX}` : "review-picker";
+}
 
 export function paneEntrypointFor(
   id: ReviewActionId,

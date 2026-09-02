@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { parse } from "smol-toml";
 import {
   paneEntrypointFor,
+  pickerEntrypointFor,
   REVIEW_ACTIONS,
   WINDOWS_PANE_SUFFIX,
   type ReviewActionId,
@@ -49,6 +50,7 @@ describe("herdr-plugin.toml", () => {
       "review:branch": ["workspace", "pane"],
       "review:commit": ["workspace"],
       "review:stash": ["workspace"],
+      "review:pick": ["workspace", "pane"],
       "send-review": ["pane"],
       reload: ["workspace", "pane"],
       "close-review": ["pane", "workspace"],
@@ -140,7 +142,13 @@ describe("herdr-plugin.toml", () => {
 
     it("declares exactly the panes the review actions open, and no others", () => {
       expect(manifest.panes.map((p: any) => p.id).sort()).toEqual(
-        [...new Set(entrypoints())].sort(),
+        [
+          ...new Set([
+            ...entrypoints(),
+            pickerEntrypointFor("darwin"),
+            pickerEntrypointFor("win32"),
+          ]),
+        ].sort(),
       );
     });
 

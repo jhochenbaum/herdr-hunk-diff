@@ -13,6 +13,8 @@ import { commitExists, hasCommitsAhead, realRunner, repoRoot, resolveBaseRef } f
 import {
   isReviewAction,
   paneEntrypointFor,
+  pickerEntrypointFor,
+  PICK_REVIEW_ACTION,
   reviewRequestFor,
   type ReviewActionId,
 } from "./actions.js";
@@ -26,7 +28,10 @@ export interface Runtime {
   /** Shared directory for the review index and note sidecars. */
   stateDir: string;
   index: ReviewIndex;
-  herdr: Pick<HerdrAdapter, "notify" | "promptAgent" | "openPane" | "closePane" | "reportMetadata">;
+  herdr: Pick<
+    HerdrAdapter,
+    "notify" | "promptAgent" | "openPane" | "closePane" | "reportMetadata" | "paneList"
+  >;
   hunk: Pick<HunkAdapter, "listComments" | "removeComment" | "reload" | "navigate">;
   /** Config-driven target, equivalent to `targetFor()`. */
   target: Target;
@@ -107,22 +112,41 @@ function displayedReviewRecord(
   };
 }
 
-/** Opens or re-points a review using the mode encoded by its action id. */
-async function reviewAction(actionId: ReviewActionId, rt: Runtime): Promise<number> {
-  const request = reviewRequestFor(actionId);
+export interface ReviewAssociation {
+  agentName?: string;
+  agentPaneId?: string;
+}
 
-  const suppliedRef = commitRefFromContext(actionId, rt);
+function associationFromContext(rt: Runtime): ReviewAssociation {
+  return { agentName: rt.ctx.agentName, agentPaneId: agentPaneFromContext(rt) };
+}
 
-  const target = rt.targetFor(request.mode, suppliedRef);
+/** Opens or re-points a review whose repository and ref have already been resolved. */
+export async function openReviewTarget(
+  actionId: ReviewActionId,
+  target: Target,
+  suppliedRef: string | undefined,
+  rt: Runtime,
+  association: ReviewAssociation = associationFromContext(rt),
+): Promise<number> {
   if (target.warning) rt.herdr.notify(target.warning);
 
   // hunk writes its own failure into a pane herdr then tears down, so the message never lands.
-  if (suppliedRef !== undefined && !rt.commitExists(target.worktree, suppliedRef)) {
+  if (
+    target.mode === "commit" &&
+    suppliedRef !== undefined &&
+    !rt.commitExists(target.worktree, suppliedRef)
+  ) {
     return reportFailure(
       rt.herdr,
       `Could not resolve ${suppliedRef} in ${target.worktree}. ` +
         "Fetch the commit, then try the link again.",
     );
+  }
+
+  // Explicit picker choices must update the round-trip destination even when a pane is reused.
+  if (association.agentName || association.agentPaneId) {
+    rt.index.upsert({ worktree: target.worktree, ...association, sent: [] });
   }
 
   const existing = rt.index.get(target.worktree);
@@ -150,8 +174,7 @@ async function reviewAction(actionId: ReviewActionId, rt: Runtime): Promise<numb
   // Herdr starts the pane process during openPane, so its launch state must already be persisted.
   rt.index.upsert({
     worktree: target.worktree,
-    agentName: rt.ctx.agentName,
-    agentPaneId: agentPaneFromContext(rt),
+    ...association,
     ...displayedReviewRecord(target, suppliedRef),
     sent: [],
   });
@@ -174,6 +197,16 @@ async function reviewAction(actionId: ReviewActionId, rt: Runtime): Promise<numb
   rt.index.upsert({ worktree: target.worktree, paneId, sent: [] });
   await reportReviewMetadata(rt, target);
   return 0;
+}
+
+/** Opens or re-points a review using the mode encoded by its action id. */
+async function reviewAction(actionId: ReviewActionId, rt: Runtime): Promise<number> {
+  const request = reviewRequestFor(actionId);
+
+  const suppliedRef = commitRefFromContext(actionId, rt);
+
+  const target = rt.targetFor(request.mode, suppliedRef);
+  return openReviewTarget(actionId, target, suppliedRef, rt);
 }
 
 /** Returns the invoking pane only when Herdr reports that it runs an agent. */
@@ -270,6 +303,21 @@ async function navigateAction(
 }
 
 export async function dispatch(actionId: string, rt: Runtime): Promise<number> {
+  if (actionId === PICK_REVIEW_ACTION) {
+    const entrypoint = pickerEntrypointFor();
+    const paneId = rt.herdr.openPane({
+      entrypoint,
+      cwd: rt.target.worktree,
+      placement: "overlay",
+    });
+    return paneId
+      ? 0
+      : reportFailure(
+          rt.herdr,
+          `Could not open the review picker (entrypoint "${entrypoint}"). ` +
+            "Check `herdr plugin log list` for the failure.",
+        );
+  }
   if (isReviewAction(actionId)) return reviewAction(actionId, rt);
 
   switch (actionId) {

@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { paneEntrypointFor } from "../src/actions.js";
+import { paneEntrypointFor, pickerEntrypointFor } from "../src/actions.js";
 import { DEFAULTS } from "../src/config.js";
 import { DEFAULT_BINDINGS } from "../src/keys.js";
-import { dispatch } from "../src/runtime.js";
+import { dispatch, openReviewTarget } from "../src/runtime.js";
 import { ReviewIndex } from "../src/index-store.js";
 import { HunkUnavailableError } from "../src/hunk.js";
 
@@ -36,7 +36,57 @@ function runtime(over: Record<string, any> = {}) {
   return rt;
 }
 
+describe("review picker", () => {
+  it("opens a temporary overlay in the current repository", async () => {
+    const rt = runtime();
+    expect(await dispatch("review:pick", rt as any)).toBe(0);
+    expect(rt.herdr.openPane).toHaveBeenCalledWith({
+      entrypoint: pickerEntrypointFor(),
+      cwd: "/wt/x",
+      placement: "overlay",
+    });
+  });
+
+  it("reports when Herdr cannot open the picker pane", async () => {
+    const rt = runtime({
+      herdr: {
+        notify: vi.fn(),
+        promptAgent: vi.fn(() => true),
+        openPane: vi.fn(() => null),
+        closePane: vi.fn(() => true),
+      },
+    });
+    expect(await dispatch("review:pick", rt as any)).toBe(1);
+    expect(rt.herdr.notify).toHaveBeenCalledWith(expect.stringMatching(/review picker/i));
+  });
+});
+
 describe("reuse_pane", () => {
+  it("updates the round-trip agent when an explicit repository selection reuses a pane", async () => {
+    const rt = runtime();
+    rt.index.upsert({
+      worktree: "/wt/x",
+      paneId: "w1:p7",
+      agentName: "old-agent",
+      agentPaneId: "w1:p1",
+      sent: [],
+    });
+    expect(
+      await openReviewTarget(
+        "review:branch",
+        { worktree: "/wt/x", mode: "branch", ref: "origin/main...HEAD" },
+        "origin/main...HEAD",
+        rt as any,
+        { agentName: "backend", agentPaneId: "w1:p9" },
+      ),
+    ).toBe(0);
+    expect(rt.index.get("/wt/x")).toMatchObject({
+      agentName: "backend",
+      agentPaneId: "w1:p9",
+      paneId: "w1:p7",
+    });
+  });
+
   it("reloads an existing review instead of opening a second pane", async () => {
     const rt = runtime();
     rt.index.upsert({ worktree: "/wt/x", paneId: "w1:p7", sent: [] });
@@ -524,7 +574,7 @@ describe("setup-keys reporting", () => {
 
     expect(code).toBe(0);
     expect(rt.herdr.notify).toHaveBeenCalledWith(
-      expect.stringContaining("Installed 4 keybinding(s)"),
+      expect.stringContaining("Installed 5 keybinding(s)"),
     );
     expect(readFileSync(override, "utf8")).toContain("jhochenbaum.hunkdiff.review");
     expect(readFileSync(defaultConfigPath(fakeHome), "utf8")).toBe(userBinding("prefix+shift+h"));
@@ -542,7 +592,7 @@ describe("setup-keys reporting", () => {
     );
 
     expect(code).toBe(0);
-    expect(rt.herdr.notify).toHaveBeenCalledWith(expect.stringContaining("Installed 3 of 4"));
+    expect(rt.herdr.notify).toHaveBeenCalledWith(expect.stringContaining("Installed 4 of 5"));
     expect(readFileSync(override, "utf8")).toContain(userBinding("prefix+shift+h"));
   });
 
@@ -578,7 +628,7 @@ describe("setup-keys reporting", () => {
     expect(rt.herdr.notify).toHaveBeenCalledWith(
       expect.stringContaining("prefix+shift+h (jhochenbaum.hunkdiff.review)"),
     );
-    expect(rt.herdr.notify).toHaveBeenCalledWith(expect.stringContaining("Installed 3 of 4"));
+    expect(rt.herdr.notify).toHaveBeenCalledWith(expect.stringContaining("Installed 4 of 5"));
   });
 
   it("exits 1 and says nothing was installed when every key collided", async () => {
@@ -587,6 +637,6 @@ describe("setup-keys reporting", () => {
     const code = await dispatchWithHome(homeWithConfig(allTaken), rt);
 
     expect(code).toBe(1);
-    expect(rt.herdr.notify).toHaveBeenCalledWith(expect.stringContaining("Installed 0 of 4"));
+    expect(rt.herdr.notify).toHaveBeenCalledWith(expect.stringContaining("Installed 0 of 5"));
   });
 });

@@ -158,12 +158,13 @@ describe("takenKeys", () => {
 });
 
 describe("DEFAULT_BINDINGS", () => {
-  it("binds the four motions common enough to earn a default key", () => {
+  it("binds the five motions common enough to earn a default key", () => {
     expect(DEFAULT_BINDINGS.map((b) => [b.key, b.action])).toEqual([
       ["prefix+shift+h", "jhochenbaum.hunkdiff.review"],
       ["prefix+shift+s", "jhochenbaum.hunkdiff.send-review"],
       ["prefix+shift+c", "jhochenbaum.hunkdiff.review:commit"],
       ["prefix+shift+a", "jhochenbaum.hunkdiff.review:staged"],
+      ["prefix+alt+h", "jhochenbaum.hunkdiff.review:pick"],
     ]);
   });
 

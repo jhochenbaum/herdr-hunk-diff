@@ -167,6 +167,7 @@ describe("installKeys", () => {
       "prefix+shift+s",
       "prefix+shift+c",
       "prefix+shift+a",
+      "prefix+alt+h",
     ]);
     expect(res.skipped!.map((b) => b.key)).toEqual(["prefix+shift+h"]);
 
@@ -177,7 +178,7 @@ describe("installKeys", () => {
 
   it("names each skipped key and the action it would have bound, so it can be rebound by hand", () => {
     const res = installKeys(config(COLLIDING), DEFAULT_BINDINGS);
-    expect(res.message).toContain("Installed 3 of 4 keybinding(s)");
+    expect(res.message).toContain("Installed 4 of 5 keybinding(s)");
     expect(res.message).toContain("prefix+shift+h");
     expect(res.message).toContain("jhochenbaum.hunkdiff.review");
     expect(res.message).toContain("already bound");

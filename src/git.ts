@@ -66,3 +66,28 @@ export function hasCommitsAhead(repo: string, base: string, run: Runner): boolea
 export function commitExists(repo: string, ref: string, run: Runner): boolean {
   return run("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]).status === 0;
 }
+
+/** Lists concrete local and remote branch refs, excluding symbolic and self-comparison refs. */
+export function listBaseRefs(repo: string, run: Runner): string[] {
+  const result = run("git", [
+    "for-each-ref",
+    "--format=%(refname:short)%09%(symref)",
+    "refs/heads",
+    "refs/remotes",
+  ]);
+  if (result.status !== 0) return [];
+
+  const current = run("git", ["symbolic-ref", "--quiet", "--short", "HEAD"]);
+  const branch = current.status === 0 ? current.stdout.trim() : "";
+
+  return [
+    ...new Set(
+      result.stdout
+        .split("\n")
+        .map((line) => line.split("\t"))
+        .filter(([ref, symref]) => Boolean(ref) && !symref)
+        .map(([ref]) => ref!)
+        .filter((ref) => !branch || !namesBranch(ref, branch)),
+    ),
+  ].sort();
+}
