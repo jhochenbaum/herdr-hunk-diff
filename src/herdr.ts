@@ -13,6 +13,15 @@ export interface HerdrAgent {
   agent_status?: string;
 }
 
+export interface HerdrPane {
+  pane_id?: string;
+  workspace_id?: string;
+  cwd?: string;
+  foreground_cwd?: string;
+  agent?: string;
+  display_agent?: string;
+}
+
 /** Reports through both the user notification channel and Herdr's captured stderr. */
 export function reportFailure(herdr: { notify: (message: string) => void }, message: string): 1 {
   console.error(`hunkdiff: ${message}`);
@@ -111,6 +120,30 @@ export class HerdrAdapter {
           pane_id: asString(agent.pane_id),
           cwd: asString(agent.cwd),
           agent_status: asString(agent.agent_status),
+        },
+      ];
+    });
+  }
+
+  /** Lists panes so workspace-scoped tools can discover repositories beyond the focused pane. */
+  paneList(workspaceId?: string): HerdrPane[] {
+    const args = ["pane", "list"];
+    if (workspaceId) args.push("--workspace", workspaceId);
+    const response = this.json(args);
+    const panes = asObject(response?.result)?.panes;
+    if (!Array.isArray(panes)) return [];
+
+    return panes.flatMap((value): HerdrPane[] => {
+      const pane = asObject(value);
+      if (!pane) return [];
+      return [
+        {
+          pane_id: asString(pane.pane_id),
+          workspace_id: asString(pane.workspace_id),
+          cwd: asString(pane.cwd),
+          foreground_cwd: asString(pane.foreground_cwd),
+          agent: asString(pane.agent),
+          display_agent: asString(pane.display_agent),
         },
       ];
     });

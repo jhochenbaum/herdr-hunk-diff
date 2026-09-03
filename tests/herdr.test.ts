@@ -139,6 +139,57 @@ describe("HerdrAdapter", () => {
     expect(wrongField.agentList()).toEqual([]);
   });
 
+  it("lists panes in one workspace with cwd and agent fields", () => {
+    const calls: string[][] = [];
+    const herdr = new HerdrAdapter("herdr", (args) => {
+      calls.push(args);
+      return {
+        status: 0,
+        stdout: JSON.stringify({
+          result: {
+            panes: [
+              {
+                pane_id: "w1:p1",
+                workspace_id: "w1",
+                cwd: "/repo",
+                foreground_cwd: "/repo/src",
+                agent: "claude",
+                display_agent: "api",
+              },
+              null,
+              { pane_id: 42, cwd: false },
+            ],
+          },
+        }),
+      };
+    });
+
+    expect(herdr.paneList("w1")).toEqual([
+      {
+        pane_id: "w1:p1",
+        workspace_id: "w1",
+        cwd: "/repo",
+        foreground_cwd: "/repo/src",
+        agent: "claude",
+        display_agent: "api",
+      },
+      {
+        pane_id: undefined,
+        workspace_id: undefined,
+        cwd: undefined,
+        foreground_cwd: undefined,
+        agent: undefined,
+        display_agent: undefined,
+      },
+    ]);
+    expect(calls[0]).toEqual(["pane", "list", "--workspace", "w1"]);
+  });
+
+  it("returns no panes when pane-list JSON has an unexpected shape", () => {
+    const herdr = new HerdrAdapter("herdr", () => ({ status: 0, stdout: "{}" }));
+    expect(herdr.paneList()).toEqual([]);
+  });
+
   it("reports pane metadata with the pane id FIRST and a plugin-scoped source", () => {
     const calls: string[][] = [];
     const herdr = new HerdrAdapter("herdr", (args) => {

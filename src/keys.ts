@@ -32,6 +32,11 @@ export const DEFAULT_BINDINGS: Binding[] = [
     action: `${PLUGIN_ID}.review:staged`,
     description: "hunk: review staged changes",
   },
+  {
+    key: "prefix+alt+h",
+    action: `${PLUGIN_ID}.review:pick`,
+    description: "hunk: pick a repository and base to review",
+  },
 ];
 
 export class ConfigParseError extends Error {

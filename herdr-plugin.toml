@@ -104,6 +104,34 @@ placement = "split"
 platforms = ["windows"]
 command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\pane.js\" review:stash"]
 
+[[panes]]
+id = "review-picker"
+title = "pick a hunk review target"
+placement = "overlay"
+platforms = ["macos", "linux"]
+command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/picker.js\""]
+
+[[panes]]
+id = "review-picker-windows"
+title = "pick a hunk review target"
+placement = "overlay"
+platforms = ["windows"]
+command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\picker.js\""]
+
+[[panes]]
+id = "send-review-picker"
+title = "pick a review recipient"
+placement = "overlay"
+platforms = ["macos", "linux"]
+command = ["sh", "-c", "exec node \"$HERDR_PLUGIN_ROOT/dist/bin/send-picker.js\""]
+
+[[panes]]
+id = "send-review-picker-windows"
+title = "pick a review recipient"
+placement = "overlay"
+platforms = ["windows"]
+command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\send-picker.js\""]
+
 [[actions]]
 id = "review"
 title = "hunk: review changes"
@@ -163,6 +191,18 @@ id = "review:stash"
 title = "hunk: review the most recent stash entry"
 contexts = ["workspace"]
 command = ["node", "dist/bin/action.js", "review:stash"]
+
+[[actions]]
+id = "review:pick"
+title = "hunk: pick a repository and base to review"
+contexts = ["workspace", "pane"]
+command = ["node", "dist/bin/action.js", "review:pick"]
+
+[[actions]]
+id = "send-review:pick"
+title = "hunk: pick an agent and send review"
+contexts = ["workspace", "pane"]
+command = ["node", "dist/bin/action.js", "send-review:pick"]
 
 [[actions]]
 id = "next-comment"

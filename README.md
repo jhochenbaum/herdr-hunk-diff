@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/a36991a9-288f-4c8a-845c-ce2399334b9b
 - [Requirements](#requirements)
 - [Quick start](#quick-start)
 - [Keybinding behavior](#keybinding-behavior)
-- [Review actions](#review-actions) &middot; [Base branch resolution](#base-branch-resolution) &middot; [GitHub commit links](#github-commit-links)
+- [Review actions](#review-actions) &middot; [Multi-repository workspaces](#multi-repository-workspaces) &middot; [Base branch resolution](#base-branch-resolution) &middot; [GitHub commit links](#github-commit-links)
 - [Configuration](#configuration) &middot; [Options](#option-reference) &middot; [Automatic opening](#automatic-opening) &middot; [Target and display](#review-target-and-display) &middot; [Round-trip prompts](#round-trip-prompts) &middot; [Hunk executable](#hunk-executable)
 - [Optional VCS pager setup](#optional-vcs-pager-setup)
 - [Direct hunk workflows](#direct-hunk-workflows)
@@ -91,6 +91,7 @@ herdr plugin action invoke send-review \
 | `prefix+shift+s` | Send review to agent   |
 | `prefix+shift+c` | Review the last commit |
 | `prefix+shift+a` | Review staged changes  |
+| `prefix+alt+h`   | Pick repository/base   |
 
 ### 3. Review and send
 
@@ -146,26 +147,62 @@ herdr server reload-config
 | `review:branch` | `<base>...HEAD`; falls back to the working tree with a warning when no base can be resolved                |
 | `review:commit` | The latest commit, or a locally available commit from a Ctrl-clicked GitHub commit URL                     |
 | `review:stash`  | The most recent stash entry                                                                                |
+| `review:pick`   | Choose a repository, base branch, and feedback agent from the current multi-repository workspace           |
 
 **Everything else**
 
-| Action            | Effect                                                    |
-| ----------------- | --------------------------------------------------------- |
-| `send-review`     | Send all unsent inline comments to the associated agent   |
-| `reload`          | Reload the target shown in the current review pane        |
-| `close-review`    | Close the review pane for the current worktree            |
-| `next-comment`    | Move hunk to the next annotated hunk                      |
-| `prev-comment`    | Move hunk to the previous annotated hunk                  |
-| `setup-keys`      | Install the default herdr keybindings                     |
-| `remove-keys`     | Remove only the keybinding block installed by this plugin |
-| `install-pager`   | Configure supported VCS pagers                            |
-| `uninstall-pager` | Remove pager configuration owned by this plugin           |
+| Action             | Effect                                                               |
+| ------------------ | -------------------------------------------------------------------- |
+| `send-review`      | Send all unsent inline comments to the associated agent              |
+| `send-review:pick` | Choose any live agent in the current workspace, then send the review |
+| `reload`           | Reload the target shown in the current review pane                   |
+| `close-review`     | Close the review pane for the current worktree                       |
+| `next-comment`     | Move hunk to the next annotated hunk                                 |
+| `prev-comment`     | Move hunk to the previous annotated hunk                             |
+| `setup-keys`       | Install the default herdr keybindings                                |
+| `remove-keys`      | Remove only the keybinding block installed by this plugin            |
+| `install-pager`    | Configure supported VCS pagers                                       |
+| `uninstall-pager`  | Remove pager configuration owned by this plugin                      |
 
 Invoke any action from the CLI with:
 
 ```bash
 herdr plugin action invoke <action> --plugin jhochenbaum.hunkdiff
 ```
+
+### Multi-repository workspaces
+
+Use `review:pick` when panes in one Herdr workspace belong to different repositories:
+
+```bash
+herdr plugin action invoke review:pick --plugin jhochenbaum.hunkdiff
+```
+
+The temporary picker inspects every pane in the current workspace, prefers each pane's foreground
+working directory, and canonicalizes it to a Git repository root. It then asks for:
+
+1. the repository to review;
+2. the base branch for a `<base>...HEAD` review; and
+3. the destination agent when more than one agent is working in that repository.
+
+The current repository and Git's normally resolved base are listed first. Selecting an agent also
+associates that pane with the chosen repository, so `send-review` routes the comments back to the
+right worker even when the review pane is opened from a different repository. If the selected
+repository has no agent pane, the review still opens; sending requires an association recorded by
+an earlier agent event or review.
+
+The picker is implemented by the plugin and has no `fzf` or shell-script dependency.
+
+If several agents share a workspace and you want to choose the recipient at send time, invoke
+`send-review:pick`. This selection becomes the worktree's association for subsequent ordinary
+`send-review` actions:
+
+```bash
+herdr plugin action invoke send-review:pick --plugin jhochenbaum.hunkdiff
+```
+
+The action is deliberately not assigned a default key because Herdr already uses several natural
+`prefix+alt+...` candidates. Add a project-specific binding if you have freed one in your config.
 
 ### Base branch resolution
 
@@ -423,6 +460,7 @@ Invalid TOML and invalid values fall back to defaults.
 ## Known limitations
 
 - Review actions cannot receive pathspecs, patch paths, file pairs, or arbitrary revisions.
+- `review:pick` discovers only Git repositories represented by panes in the current workspace.
 - Stash reviews cannot be reloaded in place; close and reopen them.
 - Sending comments is explicit through `send-review`; closing a pane does not send them.
 - GitHub links support commits already present locally, not pull requests.
