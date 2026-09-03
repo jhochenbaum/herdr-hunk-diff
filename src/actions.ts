@@ -14,6 +14,9 @@ export type ReviewActionId = (typeof REVIEW_ACTIONS)[number];
 /** Opens the repository/base/agent picker instead of a review directly. */
 export const PICK_REVIEW_ACTION = "review:pick";
 
+/** Opens an agent picker and sends the current review to the selected agent. */
+export const PICK_SEND_ACTION = "send-review:pick";
+
 export function isReviewAction(id: string): id is ReviewActionId {
   return (REVIEW_ACTIONS as readonly string[]).includes(id);
 }
@@ -51,6 +54,10 @@ export const WINDOWS_PANE_SUFFIX = "-windows";
 
 export function pickerEntrypointFor(platform: NodeJS.Platform = process.platform): string {
   return platform === "win32" ? `review-picker${WINDOWS_PANE_SUFFIX}` : "review-picker";
+}
+
+export function sendPickerEntrypointFor(platform: NodeJS.Platform = process.platform): string {
+  return platform === "win32" ? `send-review-picker${WINDOWS_PANE_SUFFIX}` : "send-review-picker";
 }
 
 export function paneEntrypointFor(

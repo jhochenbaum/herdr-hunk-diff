@@ -4,12 +4,13 @@ import { stdin, stdout } from "node:process";
 import type { HerdrPane } from "./herdr.js";
 import { listBaseRefs, realRunner, repoRoot, resolveBaseRef, type Runner } from "./git.js";
 import { reportFailure } from "./herdr.js";
-import { openReviewTarget, type ReviewAssociation, type Runtime } from "./runtime.js";
+import { openReviewTarget, sendReviewTo, type ReviewAssociation, type Runtime } from "./runtime.js";
 import type { Target } from "./target.js";
 
 export interface AgentChoice extends ReviewAssociation {
   paneId: string;
   label: string;
+  worktree?: string;
 }
 
 export interface RepositoryChoice {
@@ -61,6 +62,34 @@ export function discoverRepositories(
     if (a.worktree === current) return -1;
     if (b.worktree === current) return 1;
     return a.worktree.localeCompare(b.worktree);
+  });
+}
+
+/** Lists every live agent in a workspace, with agents in the current repository first. */
+export function discoverAgents(
+  panes: HerdrPane[],
+  currentWorktree: string,
+  rootFor: RepoRoot,
+): AgentChoice[] {
+  const seen = new Set<string>();
+  const agents: AgentChoice[] = [];
+  for (const pane of panes) {
+    if (!pane.pane_id || !pane.agent || seen.has(pane.pane_id)) continue;
+    seen.add(pane.pane_id);
+    const worktree = rootFor(pane.foreground_cwd ?? pane.cwd ?? "") ?? undefined;
+    const name = pane.display_agent ?? pane.agent;
+    agents.push({
+      paneId: pane.pane_id,
+      agentPaneId: pane.pane_id,
+      agentName: name,
+      worktree,
+      label: `${name} (${pane.pane_id})${worktree ? ` — ${basename(worktree)}` : ""}`,
+    });
+  }
+  return agents.sort((a, b) => {
+    if (a.worktree === currentWorktree && b.worktree !== currentWorktree) return -1;
+    if (b.worktree === currentWorktree && a.worktree !== currentWorktree) return 1;
+    return a.label.localeCompare(b.label);
   });
 }
 
@@ -122,6 +151,12 @@ export interface PickerDeps {
   openReview?: typeof openReviewTarget;
 }
 
+export interface SendPickerDeps {
+  rootFor: RepoRoot;
+  io: PickerIo;
+  sendReview: (rt: Runtime, association: ReviewAssociation) => Promise<number>;
+}
+
 /** Selects a repository, review target and (when ambiguous) feedback agent. */
 export async function runReviewPicker(rt: Runtime, deps: PickerDeps): Promise<number> {
   const repositories = discoverRepositories(
@@ -180,6 +215,39 @@ export async function runTerminalReviewPicker(rt: Runtime): Promise<number> {
       rootFor: (dir) => repoRoot(dir, realRunner(dir)),
       runnerFor: realRunner,
       io: terminal.io,
+    });
+  } finally {
+    terminal.close();
+  }
+}
+
+/** Selects any live agent in the current workspace and delivers the open review to it. */
+export async function runSendReviewPicker(rt: Runtime, deps: SendPickerDeps): Promise<number> {
+  const agents = discoverAgents(
+    rt.herdr.paneList(rt.ctx.workspaceId),
+    rt.target.worktree,
+    deps.rootFor,
+  );
+  if (agents.length === 0) {
+    return reportFailure(rt.herdr, "No live agents were found in this Herdr workspace.");
+  }
+  const agent = await chooseNumbered(
+    "Agent to receive review comments",
+    agents.map((candidate) => ({ label: candidate.label, value: candidate })),
+    deps.io,
+  );
+  if (!agent) return 0;
+  return deps.sendReview(rt, agent);
+}
+
+/** Production wiring for the interactive send picker pane. */
+export async function runTerminalSendReviewPicker(rt: Runtime): Promise<number> {
+  const terminal = terminalIo();
+  try {
+    return await runSendReviewPicker(rt, {
+      rootFor: (dir) => repoRoot(dir, realRunner(dir)),
+      io: terminal.io,
+      sendReview: sendReviewTo,
     });
   } finally {
     terminal.close();

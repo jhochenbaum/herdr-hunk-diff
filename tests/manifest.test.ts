@@ -5,6 +5,7 @@ import {
   paneEntrypointFor,
   pickerEntrypointFor,
   REVIEW_ACTIONS,
+  sendPickerEntrypointFor,
   WINDOWS_PANE_SUFFIX,
   type ReviewActionId,
 } from "../src/actions.js";
@@ -52,6 +53,7 @@ describe("herdr-plugin.toml", () => {
       "review:stash": ["workspace"],
       "review:pick": ["workspace", "pane"],
       "send-review": ["pane"],
+      "send-review:pick": ["workspace", "pane"],
       reload: ["workspace", "pane"],
       "close-review": ["pane", "workspace"],
       "setup-keys": ["workspace"],
@@ -147,6 +149,8 @@ describe("herdr-plugin.toml", () => {
             ...entrypoints(),
             pickerEntrypointFor("darwin"),
             pickerEntrypointFor("win32"),
+            sendPickerEntrypointFor("darwin"),
+            sendPickerEntrypointFor("win32"),
           ]),
         ].sort(),
       );

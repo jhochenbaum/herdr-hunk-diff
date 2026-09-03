@@ -151,17 +151,18 @@ herdr server reload-config
 
 **Everything else**
 
-| Action            | Effect                                                    |
-| ----------------- | --------------------------------------------------------- |
-| `send-review`     | Send all unsent inline comments to the associated agent   |
-| `reload`          | Reload the target shown in the current review pane        |
-| `close-review`    | Close the review pane for the current worktree            |
-| `next-comment`    | Move hunk to the next annotated hunk                      |
-| `prev-comment`    | Move hunk to the previous annotated hunk                  |
-| `setup-keys`      | Install the default herdr keybindings                     |
-| `remove-keys`     | Remove only the keybinding block installed by this plugin |
-| `install-pager`   | Configure supported VCS pagers                            |
-| `uninstall-pager` | Remove pager configuration owned by this plugin           |
+| Action             | Effect                                                               |
+| ------------------ | -------------------------------------------------------------------- |
+| `send-review`      | Send all unsent inline comments to the associated agent              |
+| `send-review:pick` | Choose any live agent in the current workspace, then send the review |
+| `reload`           | Reload the target shown in the current review pane                   |
+| `close-review`     | Close the review pane for the current worktree                       |
+| `next-comment`     | Move hunk to the next annotated hunk                                 |
+| `prev-comment`     | Move hunk to the previous annotated hunk                             |
+| `setup-keys`       | Install the default herdr keybindings                                |
+| `remove-keys`      | Remove only the keybinding block installed by this plugin            |
+| `install-pager`    | Configure supported VCS pagers                                       |
+| `uninstall-pager`  | Remove pager configuration owned by this plugin                      |
 
 Invoke any action from the CLI with:
 
@@ -191,6 +192,17 @@ repository has no agent pane, the review still opens; sending requires an associ
 an earlier agent event or review.
 
 The picker is implemented by the plugin and has no `fzf` or shell-script dependency.
+
+If several agents share a workspace and you want to choose the recipient at send time, invoke
+`send-review:pick`. This selection becomes the worktree's association for subsequent ordinary
+`send-review` actions:
+
+```bash
+herdr plugin action invoke send-review:pick --plugin jhochenbaum.hunkdiff
+```
+
+The action is deliberately not assigned a default key because Herdr already uses several natural
+`prefix+alt+...` candidates. Add a project-specific binding if you have freed one in your config.
 
 ### Base branch resolution
 

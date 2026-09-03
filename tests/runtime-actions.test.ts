@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { paneEntrypointFor, pickerEntrypointFor } from "../src/actions.js";
+import { paneEntrypointFor, pickerEntrypointFor, sendPickerEntrypointFor } from "../src/actions.js";
 import { DEFAULTS } from "../src/config.js";
 import { DEFAULT_BINDINGS } from "../src/keys.js";
-import { dispatch, openReviewTarget } from "../src/runtime.js";
+import { dispatch, openReviewTarget, sendReviewTo } from "../src/runtime.js";
 import { ReviewIndex } from "../src/index-store.js";
 import { HunkUnavailableError } from "../src/hunk.js";
 
@@ -58,6 +58,31 @@ describe("review picker", () => {
     });
     expect(await dispatch("review:pick", rt as any)).toBe(1);
     expect(rt.herdr.notify).toHaveBeenCalledWith(expect.stringMatching(/review picker/i));
+  });
+});
+
+describe("send picker", () => {
+  it("opens a temporary agent picker in the current repository", async () => {
+    const rt = runtime();
+    expect(await dispatch("send-review:pick", rt as any)).toBe(0);
+    expect(rt.herdr.openPane).toHaveBeenCalledWith({
+      entrypoint: sendPickerEntrypointFor(),
+      cwd: "/wt/x",
+      placement: "overlay",
+    });
+  });
+
+  it("reports when Herdr cannot open the agent picker pane", async () => {
+    const rt = runtime({
+      herdr: {
+        notify: vi.fn(),
+        promptAgent: vi.fn(() => true),
+        openPane: vi.fn(() => null),
+        closePane: vi.fn(() => true),
+      },
+    });
+    expect(await dispatch("send-review:pick", rt as any)).toBe(1);
+    expect(rt.herdr.notify).toHaveBeenCalledWith(expect.stringMatching(/agent picker/i));
   });
 });
 
@@ -332,6 +357,40 @@ describe("pane metadata reporting", () => {
     expect(reportMetadata).toHaveBeenCalledWith("w1:p7", {
       title: "Review: x",
       display_agent: "hunk",
+    });
+  });
+
+  it("sends to an explicitly selected agent and remembers it for later rounds", async () => {
+    const promptAgent = vi.fn(() => true);
+    const rt = runtime({
+      ctx: { worktree: "/wt/x", workspaceId: "w1", paneId: "w1:p7" },
+      herdr: {
+        notify: vi.fn(),
+        promptAgent,
+        openPane: vi.fn(() => "w1:p7"),
+        closePane: vi.fn(() => true),
+      },
+      hunk: {
+        listComments: vi.fn(async () => [
+          { noteId: "c1", filePath: "src/a.ts", newRange: [3, 3], body: "Fix" },
+        ]),
+        removeComment: vi.fn(async () => {}),
+        reload: vi.fn(async () => {}),
+        navigate: vi.fn(async () => {}),
+      },
+    });
+
+    expect(
+      await sendReviewTo(rt as any, {
+        agentName: "backend",
+        agentPaneId: "w1:p9",
+      }),
+    ).toBe(0);
+    expect(promptAgent).toHaveBeenCalledWith("w1:p9", expect.stringContaining("Fix"));
+    expect(rt.index.get("/wt/x")).toMatchObject({
+      agentName: "backend",
+      agentPaneId: "w1:p9",
+      sent: ["c1"],
     });
   });
 

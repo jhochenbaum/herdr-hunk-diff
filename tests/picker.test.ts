@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   chooseNumbered,
+  discoverAgents,
   discoverRepositories,
   runReviewPicker,
+  runSendReviewPicker,
   targetChoices,
   type PickerIo,
 } from "../src/picker.js";
@@ -70,6 +72,28 @@ describe("discoverRepositories", () => {
         ],
       },
     ]);
+  });
+});
+
+describe("discoverAgents", () => {
+  const rootFor = (dir: string) => {
+    if (dir.startsWith("/repo-a")) return "/repo-a";
+    if (dir.startsWith("/repo-b")) return "/repo-b";
+    return null;
+  };
+
+  it("lists all workspace agents and puts the current repository first", () => {
+    expect(
+      discoverAgents(
+        [
+          { pane_id: "w1:p1", cwd: "/repo-a", agent: "claude" },
+          { pane_id: "w1:p2", cwd: "/repo-b", agent: "codex", display_agent: "backend" },
+          { pane_id: "w1:p3", cwd: "/tmp" },
+        ],
+        "/repo-b",
+        rootFor,
+      ).map((agent) => agent.paneId),
+    ).toEqual(["w1:p2", "w1:p1"]);
   });
 });
 
@@ -205,5 +229,51 @@ describe("runReviewPicker", () => {
       }),
     ).toBe(1);
     expect(rt.herdr.notify).toHaveBeenCalledWith(expect.stringMatching(/no git repositories/i));
+  });
+});
+
+describe("runSendReviewPicker", () => {
+  it("sends the current review to the selected workspace agent", async () => {
+    const sendReview = vi.fn(async () => 0);
+    const rt = {
+      ctx: { workspaceId: "w1" },
+      target: { worktree: "/repo-a", mode: "working" },
+      herdr: {
+        paneList: vi.fn(() => [
+          { pane_id: "w1:p1", cwd: "/repo-a", agent: "claude" },
+          { pane_id: "w1:p2", cwd: "/repo-b", agent: "codex", display_agent: "backend" },
+        ]),
+        notify: vi.fn(),
+      },
+    } as any;
+    const rootFor = (dir: string) => (dir.startsWith("/repo-") ? dir : null);
+
+    expect(
+      await runSendReviewPicker(rt, {
+        rootFor,
+        io: scriptedIo("2"),
+        sendReview,
+      }),
+    ).toBe(0);
+    expect(sendReview).toHaveBeenCalledWith(
+      rt,
+      expect.objectContaining({ agentName: "backend", agentPaneId: "w1:p2" }),
+    );
+  });
+
+  it("fails visibly when no live agent exists in the workspace", async () => {
+    const rt = {
+      ctx: { workspaceId: "w1" },
+      target: { worktree: "/repo-a", mode: "working" },
+      herdr: { paneList: () => [{ cwd: "/repo-a" }], notify: vi.fn() },
+    } as any;
+    expect(
+      await runSendReviewPicker(rt, {
+        rootFor: () => "/repo-a",
+        io: scriptedIo(),
+        sendReview: vi.fn(),
+      }),
+    ).toBe(1);
+    expect(rt.herdr.notify).toHaveBeenCalledWith(expect.stringMatching(/no live agents/i));
   });
 });

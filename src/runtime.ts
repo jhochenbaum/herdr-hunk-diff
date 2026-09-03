@@ -15,7 +15,9 @@ import {
   paneEntrypointFor,
   pickerEntrypointFor,
   PICK_REVIEW_ACTION,
+  PICK_SEND_ACTION,
   reviewRequestFor,
+  sendPickerEntrypointFor,
   type ReviewActionId,
 } from "./actions.js";
 import { DEFAULT_BINDINGS } from "./keys.js";
@@ -228,7 +230,7 @@ function commitRefFromContext(actionId: ReviewActionId, rt: Runtime): string | u
   return parsed?.ref;
 }
 
-async function sendReview(rt: Runtime): Promise<number> {
+export async function sendReviewTo(rt: Runtime, association?: ReviewAssociation): Promise<number> {
   const worktree = rt.target.worktree;
   let comments;
   try {
@@ -249,8 +251,8 @@ async function sendReview(rt: Runtime): Promise<number> {
   }
 
   const entry = rt.index.get(worktree);
-  const target = agentPaneFromContext(rt) ?? entry?.agentPaneId;
-  const label = rt.ctx.agentName ?? entry?.agentName;
+  const target = association?.agentPaneId ?? agentPaneFromContext(rt) ?? entry?.agentPaneId;
+  const label = association?.agentName ?? rt.ctx.agentName ?? entry?.agentName;
   if (!target) {
     return reportFailure(rt.herdr, "No agent is associated with this worktree; comments kept.");
   }
@@ -258,6 +260,10 @@ async function sendReview(rt: Runtime): Promise<number> {
   const text = formatReview(unsent, worktree, rt.cfg, label);
   if (!rt.herdr.promptAgent(target, text)) {
     return reportFailure(rt.herdr, `Could not prompt agent "${label ?? target}"; comments kept.`);
+  }
+
+  if (association?.agentName || association?.agentPaneId) {
+    rt.index.upsert({ worktree, ...association, sent: [] });
   }
 
   // Record delivery before cleanup so a removal failure cannot cause a duplicate prompt.
@@ -318,11 +324,26 @@ export async function dispatch(actionId: string, rt: Runtime): Promise<number> {
             "Check `herdr plugin log list` for the failure.",
         );
   }
+  if (actionId === PICK_SEND_ACTION) {
+    const entrypoint = sendPickerEntrypointFor();
+    const paneId = rt.herdr.openPane({
+      entrypoint,
+      cwd: rt.target.worktree,
+      placement: "overlay",
+    });
+    return paneId
+      ? 0
+      : reportFailure(
+          rt.herdr,
+          `Could not open the agent picker (entrypoint "${entrypoint}"). ` +
+            "Check `herdr plugin log list` for the failure.",
+        );
+  }
   if (isReviewAction(actionId)) return reviewAction(actionId, rt);
 
   switch (actionId) {
     case "send-review":
-      return sendReview(rt);
+      return sendReviewTo(rt);
     case "reload": {
       // Reload the displayed mode, falling back to config only when no mode was recorded.
       const recorded = rt.index.get(rt.target.worktree);
