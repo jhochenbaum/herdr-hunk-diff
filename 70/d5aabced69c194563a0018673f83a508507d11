@@ -1,0 +1,33 @@
+scripts/run-script.mjs
+  9aa3382401bbe664 1-3,11-14
+herdr-plugin.toml
+  9aa3382401bbe664 10
+tests/package-manager.test.ts
+  9aa3382401bbe664 1-156
+scripts/package-manager.mjs
+  9aa3382401bbe664 8,11,15,18,36
+.github/workflows/ci.yml
+  9aa3382401bbe664 40,51,57-65,77,79,82,85-94
+README.md
+  9aa3382401bbe664 41,46-47,449,451-464
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "70d5aabced69c194563a0018673f83a508507d11",
+  "prompts": {
+    "9aa3382401bbe664": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a07dbd-dbff-7373-878f-99f17e4c1966",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Jordan Hochenbaum",
+      "messages": [],
+      "total_additions": 215,
+      "total_deletions": 47,
+      "accepted_lines": 215,
+      "overriden_lines": 0
+    }
+  }
+}
