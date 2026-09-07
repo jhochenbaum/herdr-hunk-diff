@@ -8,8 +8,8 @@ import { ReviewIndex, type ReviewEntry } from "./index-store.js";
 import { formatReview, selectUnsent } from "./courier.js";
 import { parseGithubUrl } from "./notes.js";
 import { installPager, realPagerEffects, uninstallPager } from "./pager.js";
-import { resolveTarget, type Target } from "./target.js";
-import { commitExists, hasCommitsAhead, realRunner, repoRoot, resolveBaseRef } from "./git.js";
+import { describeTarget, resolveTarget, type Target } from "./target.js";
+import { commitExists, realRunner, realTargetDeps } from "./git.js";
 import {
   isReviewAction,
   paneEntrypointFor,
@@ -41,11 +41,7 @@ export function buildRuntime(env: NodeJS.ProcessEnv): Runtime {
   const pluginRoot = env.HERDR_PLUGIN_ROOT ?? process.cwd();
 
   // Avoid Git subprocesses for actions that never inspect a review target.
-  const targetDeps = {
-    resolveBaseRef: (repo: string) => resolveBaseRef(repo, realRunner(repo)),
-    hasCommitsAhead: (repo: string, base: string) => hasCommitsAhead(repo, base, realRunner(repo)),
-    repoRoot: (dir: string) => repoRoot(dir, realRunner(dir)),
-  };
+  const targetDeps = realTargetDeps(realRunner);
 
   let resolvedTarget: Target | undefined;
   const targetFor = (mode?: TargetMode, ref?: string): Target => {
@@ -85,7 +81,7 @@ async function reportReviewMetadata(rt: Runtime, target: Target): Promise<void> 
   ).length;
   try {
     rt.herdr.reportMetadata(entry.paneId, {
-      title: `Review: ${basename(target.worktree)}`,
+      title: `Review: ${basename(target.worktree)} — ${describeTarget(target)}`,
       display_agent: unsentCount > 0 ? `hunk (${unsentCount} unsent)` : "hunk",
     });
   } catch {

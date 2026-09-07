@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import type { TargetDeps } from "./target.js";
 
 export type Runner = (cmd: string, args: string[]) => { status: number; stdout: string };
 
@@ -65,4 +66,27 @@ export function hasCommitsAhead(repo: string, base: string, run: Runner): boolea
 /** `^{commit}` so an existing blob or tree name does not pass as a reviewable commit. */
 export function commitExists(repo: string, ref: string, run: Runner): boolean {
   return run("git", ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]).status === 0;
+}
+
+/** Reports uncommitted work; omitting untracked files mirrors an `--exclude-untracked` review. */
+export function hasWorkingChanges(repo: string, includeUntracked: boolean, run: Runner): boolean {
+  const args = ["status", "--porcelain"];
+  if (!includeUntracked) args.push("--untracked-files=no");
+  const r = run("git", args);
+  return r.status === 0 && r.stdout.trim().length > 0;
+}
+
+/**
+ * One wiring of target resolution over git, shared by every entry point. The runner factory is a
+ * parameter so callers keep it observable; resolving it here would hide every git call from tests.
+ */
+export function realTargetDeps(runnerFor: (dir: string) => Runner): TargetDeps {
+  return {
+    resolveBaseRef: (repo) => resolveBaseRef(repo, runnerFor(repo)),
+    hasCommitsAhead: (repo, base) => hasCommitsAhead(repo, base, runnerFor(repo)),
+    repoRoot: (dir) => repoRoot(dir, runnerFor(dir)),
+    hasWorkingChanges: (repo, includeUntracked) =>
+      hasWorkingChanges(repo, includeUntracked, runnerFor(repo)),
+    commitExists: (repo, ref) => commitExists(repo, ref, runnerFor(repo)),
+  };
 }

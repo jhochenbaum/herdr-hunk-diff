@@ -24,6 +24,8 @@ const GIT = {
   resolveBaseRef: () => "main",
   hasCommitsAhead: () => true,
   repoRoot: (dir: string) => dir,
+  hasWorkingChanges: () => false,
+  commitExists: () => true,
 };
 const resolve = (cfg: PluginConfig, mode?: TargetMode, ref?: string): Target =>
   resolveTarget({ worktree: WT }, cfg, GIT, mode, ref);

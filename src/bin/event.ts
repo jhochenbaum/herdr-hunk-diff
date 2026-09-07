@@ -3,7 +3,7 @@ import { loadConfig } from "../config.js";
 import { HerdrAdapter, resolveHunkLauncher } from "../herdr.js";
 import { HunkAdapter } from "../hunk.js";
 import { ReviewIndex } from "../index-store.js";
-import { hasCommitsAhead, realRunner, repoRoot, resolveBaseRef } from "../git.js";
+import { realRunner, realTargetDeps, repoRoot } from "../git.js";
 import { resolveTarget } from "../target.js";
 import { handleEvent, parseEvent, worktreeForPaneVia, type EventDeps } from "../events.js";
 import { isMainModule } from "./main-guard.js";
@@ -25,11 +25,7 @@ const defaultDeps: EventBinDeps = {
       herdr,
       worktreeForPane: worktreeForPaneVia(herdr, (dir) => repoRoot(dir, realRunner(dir))),
       reloadReview: (worktree) => {
-        const target = resolveTarget({ cwd: worktree }, cfg, {
-          resolveBaseRef: (repo) => resolveBaseRef(repo, realRunner(repo)),
-          hasCommitsAhead: (repo, base) => hasCommitsAhead(repo, base, realRunner(repo)),
-          repoRoot: (dir) => repoRoot(dir, realRunner(dir)),
-        });
+        const target = resolveTarget({ cwd: worktree }, cfg, realTargetDeps(realRunner));
         return hunk.reload(worktree, target, cfg);
       },
     };

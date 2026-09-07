@@ -31,6 +31,7 @@ describe("loadConfig", () => {
   it("exposes no config keys the plugin does not act on", () => {
     expect(Object.keys(DEFAULTS.review).sort()).toEqual([
       "auto_open",
+      "base",
       "default_target",
       "exclude_untracked",
       "on_states",
@@ -183,5 +184,25 @@ describe("loadConfig", () => {
     it("honours an explicitly empty extra_args", () => {
       expect(loadConfig(withConfig(`[hunk]\nextra_args = []\n`)).hunk.extra_args).toEqual([]);
     });
+  });
+});
+
+describe("the configured review base", () => {
+  it("reads a base branch from the file", () => {
+    expect(loadConfig(withConfig(`[review]\nbase = "develop"\n`)).review.base).toBe("develop");
+  });
+
+  it("reads a remote-qualified base", () => {
+    expect(loadConfig(withConfig(`[review]\nbase = "origin/develop"\n`)).review.base).toBe(
+      "origin/develop",
+    );
+  });
+
+  it("defaults to empty, leaving detection in charge", () => {
+    expect(DEFAULTS.review.base).toBe("");
+  });
+
+  it("rejects a non-string base rather than reaching git with it", () => {
+    expect(loadConfig(withConfig(`[review]\nbase = 7\n`)).review.base).toBe("");
   });
 });

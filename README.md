@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/a36991a9-288f-4c8a-845c-ce2399334b9b
 - [Requirements](#requirements)
 - [Quick start](#quick-start)
 - [Keybinding behavior](#keybinding-behavior)
-- [Review actions](#review-actions) &middot; [Base branch resolution](#base-branch-resolution) &middot; [GitHub commit links](#github-commit-links)
+- [Review actions](#review-actions) &middot; [Base branch resolution](#base-branch-resolution) &middot; [Which diff am I looking at?](#which-diff-am-i-looking-at) &middot; [GitHub commit links](#github-commit-links)
 - [Configuration](#configuration) &middot; [Options](#option-reference) &middot; [Automatic opening](#automatic-opening) &middot; [Target and display](#review-target-and-display) &middot; [Round-trip prompts](#round-trip-prompts) &middot; [Hunk executable](#hunk-executable)
 - [Optional VCS pager setup](#optional-vcs-pager-setup)
 - [Direct hunk workflows](#direct-hunk-workflows)
@@ -139,13 +139,13 @@ herdr server reload-config
 
 **Opening a review**
 
-| Action          | Review opened                                                                                              |
-| --------------- | ---------------------------------------------------------------------------------------------------------- |
-| `review`        | Configured `default_target`; `auto` selects the branch diff when ahead of base, otherwise the working tree |
-| `review:staged` | Staged changes with `hunk diff --staged`                                                                   |
-| `review:branch` | `<base>...HEAD`; falls back to the working tree with a warning when no base can be resolved                |
-| `review:commit` | The latest commit, or a locally available commit from a Ctrl-clicked GitHub commit URL                     |
-| `review:stash`  | The most recent stash entry                                                                                |
+| Action          | Review opened                                                                                            |
+| --------------- | -------------------------------------------------------------------------------------------------------- |
+| `review`        | Configured `default_target`; `auto` shows uncommitted changes, or the branch diff when the tree is clean |
+| `review:staged` | Staged changes with `hunk diff --staged`                                                                 |
+| `review:branch` | `<base>...HEAD`; falls back to the working tree with a warning when no base can be resolved              |
+| `review:commit` | The latest commit, or a locally available commit from a Ctrl-clicked GitHub commit URL                   |
+| `review:stash`  | The most recent stash entry                                                                              |
 
 **Everything else**
 
@@ -171,12 +171,31 @@ herdr plugin action invoke <action> --plugin jhochenbaum.hunkdiff
 
 Branch reviews resolve their base in this order:
 
-1. The current branch's upstream, unless it is that branch's own remote-tracking branch
-2. `origin/HEAD`
-3. The first existing branch named `main`, `master`, or `trunk`
+1. `review.base`, when set and the ref exists
+2. The current branch's upstream, unless it is that branch's own remote-tracking branch
+3. `origin/HEAD`
+4. The first existing branch named `main`, `master`, or `trunk`
 
-This keeps a feature branch that deliberately tracks `origin/main` working as expected while
-avoiding an empty comparison against `origin/<same-feature-branch>`.
+Steps 2-4 keep a feature branch that deliberately tracks `origin/main` working as expected while
+avoiding an empty comparison against `origin/<same-feature-branch>`. They also mean a branch cut
+from something other than the repository's default branch resolves to that default rather than to
+the branch it was actually cut from, because Git does not record where a branch came from. Set
+`review.base` when you want a different base:
+
+```toml
+[review]
+base = "origin/develop"
+```
+
+A `review.base` that does not exist is reported, and the review falls back to detection rather
+than handing Hunk a range it cannot resolve. An explicit range passed to `review:branch` still
+wins over both.
+
+### Which diff am I looking at?
+
+The review pane's title names the resolved target — `Review: my-repo — origin/main...HEAD`,
+`Review: my-repo — working tree`, `Review: my-repo — staged`, `Review: my-repo — commit abc1234`
+— so `auto` never leaves the comparison a guess.
 
 ### GitHub commit links
 
@@ -205,6 +224,7 @@ auto_open         = false
 on_states         = ["idle"]  # idle | working | blocked | unknown
 reuse_pane        = true
 default_target    = "auto"    # auto | working | staged | branch
+base              = ""        # branch reviews compare against this ref; empty detects one
 watch             = false
 placement         = "split"   # overlay | split | tab | zoomed
 exclude_untracked = false
@@ -228,15 +248,16 @@ extra_args   = []
 <details>
 <summary><b><code>[review]</code></b> — what opens, where, and when</summary>
 
-| Setting                    | Accepted values                                 | Effect                                                                                                                     |
-| -------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `review.auto_open`         | `true` / `false`                                | Opens or refreshes a review when an associated agent enters a configured state.                                            |
-| `review.on_states`         | List of `idle`, `working`, `blocked`, `unknown` | Selects the Herdr agent states that trigger automatic opening. An empty list disables all triggers.                        |
-| `review.reuse_pane`        | `true` / `false`                                | Refreshes the worktree's existing review pane when possible instead of opening another pane.                               |
-| `review.default_target`    | `auto`, `working`, `staged`, `branch`           | Chooses what the `review` action shows. `auto` uses the branch diff when ahead of its base and the working tree otherwise. |
-| `review.watch`             | `true` / `false`                                | Passes `--watch` to Hunk so an open review refreshes as its underlying source changes.                                     |
-| `review.placement`         | `overlay`, `split`, `tab`, `zoomed`             | Chooses where Herdr opens review panes: over the active pane, beside it, in a new tab, or as a zoomed pane.                |
-| `review.exclude_untracked` | `true` / `false`                                | Hides untracked files from working-tree, staged, and branch reviews.                                                       |
+| Setting                    | Accepted values                                 | Effect                                                                                                                                  |
+| -------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `review.auto_open`         | `true` / `false`                                | Opens or refreshes a review when an associated agent enters a configured state.                                                         |
+| `review.on_states`         | List of `idle`, `working`, `blocked`, `unknown` | Selects the Herdr agent states that trigger automatic opening. An empty list disables all triggers.                                     |
+| `review.reuse_pane`        | `true` / `false`                                | Refreshes the worktree's existing review pane when possible instead of opening another pane.                                            |
+| `review.default_target`    | `auto`, `working`, `staged`, `branch`           | Chooses what the `review` action shows. `auto` shows uncommitted changes when the working tree is dirty, and the branch diff otherwise. |
+| `review.base`              | A branch name or ref, e.g. `origin/develop`     | Comparison base for branch reviews. Empty detects one, as described under [Base branch resolution](#base-branch-resolution).            |
+| `review.watch`             | `true` / `false`                                | Passes `--watch` to Hunk so an open review refreshes as its underlying source changes.                                                  |
+| `review.placement`         | `overlay`, `split`, `tab`, `zoomed`             | Chooses where Herdr opens review panes: over the active pane, beside it, in a new tab, or as a zoomed pane.                             |
+| `review.exclude_untracked` | `true` / `false`                                | Hides untracked files from working-tree, staged, and branch reviews.                                                                    |
 
 </details>
 
@@ -281,11 +302,19 @@ Automatic opens target the pane that emitted the agent event.
 
 ### Review target and display
 
-`default_target = "auto"` selects a branch review only when the current branch has commits ahead of
-its resolved base. Otherwise, it opens the working tree.
+`default_target = "auto"` resolves in the order Hunk itself uses:
 
-`exclude_untracked = true` hides untracked files in working-tree, staged, and branch reviews. Hunk
-does not accept that option for commit or stash reviews.
+1. The working tree, whenever it has uncommitted changes — the same thing bare `hunk diff` and
+   `git diff` show
+2. The branch diff `<base>...HEAD`, when the tree is clean and the branch is ahead of its base
+3. The working tree, when neither applies
+
+Pick a fixed target with `default_target = "working"` or `"branch"` if you would rather not have it
+depend on the state of the tree. The pane title always names what was resolved.
+
+`exclude_untracked = true` hides untracked files in working-tree, staged, and branch reviews, and
+also keeps untracked files from making `auto` treat the tree as dirty. Hunk does not accept that
+option for commit or stash reviews.
 
 `placement` supports the four persistent Herdr placements that return a pane ID. Herdr's modal
 `popup` placement is intentionally excluded because it cannot be reused, addressed, closed, or

@@ -14,6 +14,26 @@ export interface TargetDeps {
   hasCommitsAhead: (repo: string, base: string) => boolean;
   /** Resolves repository identity from an arbitrary directory. */
   repoRoot: (dir: string) => string | null;
+  /** Reports uncommitted work, so auto can match `hunk diff` and show it first. */
+  hasWorkingChanges: (repo: string, includeUntracked: boolean) => boolean;
+  /** Validates a configured base before it reaches hunk as a range. */
+  commitExists: (repo: string, ref: string) => boolean;
+}
+
+/** Names what a resolved target displays, for panes and warnings. */
+export function describeTarget(target: Omit<Target, "warning">): string {
+  switch (target.mode) {
+    case "staged":
+      return "staged";
+    case "branch":
+      return target.ref ?? "branch";
+    case "commit":
+      return target.ref ? `commit ${target.ref}` : "last commit";
+    case "stash":
+      return target.ref ?? "latest stash";
+    default:
+      return "working tree";
+  }
 }
 
 /** Resolves config defaults plus optional action mode and ref overrides. */
@@ -45,9 +65,22 @@ export function resolveTarget(
   const withWarning = (target: Omit<Target, "warning">): Target =>
     warnings.length > 0 ? { ...target, warning: warnings.join(" ") } : target;
 
+  // A configured base beats detection, but only once git confirms it; a typo would reach hunk.
+  const baseRef = (): string | null => {
+    const configured = cfg.review.base.trim();
+    if (!configured) return deps.resolveBaseRef(worktree);
+    if (deps.commitExists(worktree, configured)) return configured;
+    const detected = deps.resolveBaseRef(worktree);
+    warnings.push(
+      `Configured base "${configured}" does not exist in this repository; ` +
+        (detected ? `comparing against ${detected} instead.` : "no base branch resolved."),
+    );
+    return detected;
+  };
+
   // A branch target without a base would silently become a working-tree diff.
   const branchTarget = (): Omit<Target, "warning"> | null => {
-    const base = deps.resolveBaseRef(worktree);
+    const base = baseRef();
     if (!base) {
       warnings.push("No base branch resolved; reviewing the working tree instead.");
       return null;
@@ -66,7 +99,12 @@ export function resolveTarget(
 
   if (requested !== "auto") return withWarning({ worktree, mode: requested });
 
-  const base = deps.resolveBaseRef(worktree);
+  // Uncommitted work wins, matching what bare `hunk diff` and `git diff` show.
+  if (deps.hasWorkingChanges(worktree, !cfg.review.exclude_untracked)) {
+    return withWarning({ worktree, mode: "working" });
+  }
+
+  const base = baseRef();
   if (!base) {
     warnings.push("No base branch resolved; reviewing the working tree instead.");
     return withWarning({ worktree, mode: "working" });

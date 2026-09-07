@@ -6,6 +6,7 @@ import { join } from "node:path";
 import {
   commitExists,
   hasCommitsAhead,
+  hasWorkingChanges,
   realRunner,
   resolveBaseRef,
   type Runner,
@@ -319,5 +320,34 @@ describe("commitExists", () => {
 
   it("is false when git cannot resolve the name", () => {
     expect(commitExists("/repo", "nope", () => ({ status: 1, stdout: "" }))).toBe(false);
+  });
+});
+
+describe("hasWorkingChanges", () => {
+  it("reports modified tracked files", () => {
+    const run = runner({ "status --porcelain": { status: 0, stdout: " M src/a.ts\n" } });
+    expect(hasWorkingChanges("/repo", true, run)).toBe(true);
+  });
+
+  it("reports a clean tree as unchanged", () => {
+    const run = runner({ "status --porcelain": { status: 0, stdout: "\n" } });
+    expect(hasWorkingChanges("/repo", true, run)).toBe(false);
+  });
+
+  it("counts untracked files when they are included", () => {
+    const run = runner({ "status --porcelain": { status: 0, stdout: "?? new.ts\n" } });
+    expect(hasWorkingChanges("/repo", true, run)).toBe(true);
+  });
+
+  it("asks git to omit untracked files when they are excluded", () => {
+    const run = runner({
+      "status --porcelain --untracked-files=no": { status: 0, stdout: "" },
+      "status --porcelain": { status: 0, stdout: "?? new.ts\n" },
+    });
+    expect(hasWorkingChanges("/repo", false, run)).toBe(false);
+  });
+
+  it("reports no changes when git fails, leaving base detection to decide", () => {
+    expect(hasWorkingChanges("/repo", true, runner({}))).toBe(false);
   });
 });
