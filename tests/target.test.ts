@@ -1,12 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULTS } from "../src/config.js";
 import { readContext } from "../src/context.js";
-import { resolveTarget } from "../src/target.js";
+import { describeTarget, resolveTarget } from "../src/target.js";
 
-const deps = (opts: { base?: string | null; ahead?: boolean; root?: string | null }) => ({
+const deps = (opts: {
+  base?: string | null;
+  ahead?: boolean;
+  root?: string | null;
+  dirty?: boolean;
+  exists?: boolean;
+}) => ({
   resolveBaseRef: () => (opts.base === undefined ? "origin/main" : opts.base),
   hasCommitsAhead: () => opts.ahead ?? false,
   repoRoot: (dir: string) => (opts.root === undefined ? dir : opts.root),
+  hasWorkingChanges: () => opts.dirty ?? false,
+  commitExists: () => opts.exists ?? true,
 });
 
 describe("resolveTarget", () => {
@@ -266,5 +274,185 @@ describe("readContext feeding resolveTarget", () => {
       worktree: { checkout_path: "/wt/repo" },
     });
     expect(t.worktree).toBe("/wt/other-repo");
+  });
+});
+
+describe("a configured base", () => {
+  const withBase = (base: string) => ({
+    ...DEFAULTS,
+    review: { ...DEFAULTS.review, base },
+  });
+
+  it("overrides the detected base for an auto branch review", () => {
+    const t = resolveTarget({ worktree: "/wt/x" }, withBase("develop"), deps({ ahead: true }));
+    expect(t.mode).toBe("branch");
+    expect(t.ref).toBe("develop...HEAD");
+  });
+
+  it("overrides the detected base for an explicitly requested branch review", () => {
+    const t = resolveTarget({ worktree: "/wt/x" }, withBase("origin/develop"), deps({}), "branch");
+    expect(t.ref).toBe("origin/develop...HEAD");
+  });
+
+  it("never consults the detector when a configured base resolves", () => {
+    let calls = 0;
+    const t = resolveTarget({ worktree: "/wt/x" }, withBase("develop"), {
+      ...deps({ ahead: true }),
+      resolveBaseRef: () => {
+        calls += 1;
+        return "origin/main";
+      },
+    });
+    expect(t.ref).toBe("develop...HEAD");
+    expect(calls).toBe(0);
+  });
+
+  it("warns and falls back to detection when the configured base does not exist", () => {
+    const t = resolveTarget(
+      { worktree: "/wt/x" },
+      withBase("nope"),
+      deps({ exists: false }),
+      "branch",
+    );
+    expect(t.ref).toBe("origin/main...HEAD");
+    expect(t.warning).toMatch(/nope/);
+  });
+
+  it("names the fallback in the warning so the diff on screen is explained", () => {
+    const t = resolveTarget(
+      { worktree: "/wt/x" },
+      withBase("nope"),
+      deps({ exists: false }),
+      "branch",
+    );
+    expect(t.warning).toMatch(/origin\/main/);
+  });
+
+  it("ignores a blank configured base", () => {
+    const t = resolveTarget({ worktree: "/wt/x" }, withBase("   "), deps({}), "branch");
+    expect(t.ref).toBe("origin/main...HEAD");
+    expect(t.warning).toBeUndefined();
+  });
+
+  it("still prefers a ref supplied by the caller over the configured base", () => {
+    const t = resolveTarget(
+      { worktree: "/wt/x" },
+      withBase("develop"),
+      deps({}),
+      "branch",
+      "main...feature",
+    );
+    expect(t.ref).toBe("main...feature");
+  });
+
+  it("degrades to the working tree with a warning when neither the configured base nor detection resolves", () => {
+    const t = resolveTarget(
+      { worktree: "/wt/x" },
+      withBase("nope"),
+      deps({ base: null, exists: false }),
+      "branch",
+    );
+    expect(t.mode).toBe("working");
+    expect(t.warning).toMatch(/base/i);
+  });
+});
+
+describe("auto precedence", () => {
+  it("prefers the working tree when it is dirty, even with commits ahead of the base", () => {
+    const t = resolveTarget({ worktree: "/wt/x" }, DEFAULTS, deps({ ahead: true, dirty: true }));
+    expect(t.mode).toBe("working");
+    expect(t.ref).toBeUndefined();
+  });
+
+  it("picks the branch diff when the working tree is clean and the branch is ahead", () => {
+    const t = resolveTarget({ worktree: "/wt/x" }, DEFAULTS, deps({ ahead: true, dirty: false }));
+    expect(t.mode).toBe("branch");
+    expect(t.ref).toBe("origin/main...HEAD");
+  });
+
+  it("never consults the base detector when the working tree is dirty", () => {
+    let calls = 0;
+    resolveTarget({ worktree: "/wt/x" }, DEFAULTS, {
+      ...deps({ dirty: true }),
+      resolveBaseRef: () => {
+        calls += 1;
+        return "origin/main";
+      },
+    });
+    expect(calls).toBe(0);
+  });
+
+  it("counts untracked files as working changes by default", () => {
+    let includeUntracked: boolean | undefined;
+    resolveTarget({ worktree: "/wt/x" }, DEFAULTS, {
+      ...deps({}),
+      hasWorkingChanges: (_repo: string, include: boolean) => {
+        includeUntracked = include;
+        return false;
+      },
+    });
+    expect(includeUntracked).toBe(true);
+  });
+
+  it("ignores untracked files when review.exclude_untracked is set", () => {
+    let includeUntracked: boolean | undefined;
+    const cfg = { ...DEFAULTS, review: { ...DEFAULTS.review, exclude_untracked: true } };
+    resolveTarget({ worktree: "/wt/x" }, cfg, {
+      ...deps({}),
+      hasWorkingChanges: (_repo: string, include: boolean) => {
+        includeUntracked = include;
+        return false;
+      },
+    });
+    expect(includeUntracked).toBe(false);
+  });
+
+  it("does not consult the working tree for an explicitly requested mode", () => {
+    let calls = 0;
+    const counting = {
+      ...deps({ ahead: true }),
+      hasWorkingChanges: () => {
+        calls += 1;
+        return true;
+      },
+    };
+    for (const mode of ["working", "staged", "branch", "commit", "stash"] as const) {
+      resolveTarget({ worktree: "/wt/x" }, DEFAULTS, counting, mode);
+    }
+    expect(calls).toBe(0);
+  });
+});
+
+describe("describeTarget", () => {
+  it("names the working tree", () => {
+    expect(describeTarget({ worktree: "/wt/x", mode: "working" })).toBe("working tree");
+  });
+
+  it("names staged changes", () => {
+    expect(describeTarget({ worktree: "/wt/x", mode: "staged" })).toBe("staged");
+  });
+
+  it("shows the branch range so the comparison base is visible", () => {
+    expect(describeTarget({ worktree: "/wt/x", mode: "branch", ref: "origin/main...HEAD" })).toBe(
+      "origin/main...HEAD",
+    );
+  });
+
+  it("falls back to a plain label for a branch target with no range", () => {
+    expect(describeTarget({ worktree: "/wt/x", mode: "branch" })).toBe("branch");
+  });
+
+  it("names a commit review, with and without a ref", () => {
+    expect(describeTarget({ worktree: "/wt/x", mode: "commit", ref: "abc1234" })).toBe(
+      "commit abc1234",
+    );
+    expect(describeTarget({ worktree: "/wt/x", mode: "commit" })).toBe("last commit");
+  });
+
+  it("names a stash review, with and without a ref", () => {
+    expect(describeTarget({ worktree: "/wt/x", mode: "stash", ref: "stash@{1}" })).toBe(
+      "stash@{1}",
+    );
+    expect(describeTarget({ worktree: "/wt/x", mode: "stash" })).toBe("latest stash");
   });
 });

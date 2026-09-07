@@ -49,6 +49,8 @@ function deps(over: Record<string, any> = {}) {
       closePane: vi.fn(),
     },
     worktreeForPane: vi.fn(() => "/wt/x"),
+    resolveTarget: vi.fn(() => ({ worktree: "/wt/x", mode: "working" })),
+    reportReviewMetadata: vi.fn(async () => {}),
     ...over,
   };
 }
@@ -136,7 +138,7 @@ describe("handleEvent: an agent reaching a reviewable state", () => {
     const d = deps({ cfg: { ...DEFAULTS, review: { ...DEFAULTS.review, auto_open: true } } });
     d.index.upsert({ worktree: "/wt/x", requestedMode: "staged", sent: [] });
     await fire(finishedEvent, d);
-    expect(d.index.get("/wt/x")?.requestedMode).toBeUndefined();
+    expect(d.index.get("/wt/x")?.requestedMode).toBe("working");
     expect(d.index.get("/wt/x")?.paneId).toBe("w1:p7");
   });
 
@@ -151,7 +153,7 @@ describe("handleEvent: an agent reaching a reviewable state", () => {
       const d = autoOpenDeps();
       d.index.upsert({ worktree: "/wt/x", paneId: "w1:p7", sent: [] });
       await fire(finishedEvent, d);
-      expect(d.reloadReview).toHaveBeenCalledWith("/wt/x");
+      expect(d.reloadReview).toHaveBeenCalledWith({ worktree: "/wt/x", mode: "working" });
       expect(d.herdr.openPane).not.toHaveBeenCalled();
       expect(d.index.get("/wt/x")?.paneId).toBe("w1:p7");
     });
@@ -200,8 +202,31 @@ describe("handleEvent: an agent reaching a reviewable state", () => {
       const d = autoOpenDeps();
       d.index.upsert({ worktree: "/wt/x", paneId: "w1:p7", requestedMode: "staged", sent: [] });
       await fire(finishedEvent, d);
-      expect(d.index.get("/wt/x")?.requestedMode).toBeUndefined();
+      expect(d.index.get("/wt/x")?.requestedMode).toBe("working");
     });
+  });
+
+  it.each([false, true])("updates metadata on auto-open (reuse=%s)", async (reuse) => {
+    const d = deps({
+      cfg: { ...DEFAULTS, review: { ...DEFAULTS.review, auto_open: true } },
+      reloadReview: vi.fn(async () => {}),
+    });
+    if (reuse)
+      d.index.upsert({
+        worktree: "/wt/x",
+        paneId: "w1:p7",
+        sent: [],
+        requestedMode: "commit",
+        requestedRef: "abc1234",
+        displayedTarget: "commit abc1234",
+      });
+    await fire(finishedEvent, d);
+    expect(d.reportReviewMetadata).toHaveBeenCalledWith("/wt/x");
+    expect(d.index.get("/wt/x")).toMatchObject({
+      requestedMode: "working",
+      displayedTarget: "working tree",
+    });
+    expect(d.index.get("/wt/x")?.requestedRef).toBeUndefined();
   });
 
   it("does nothing when auto_open is disabled", async () => {

@@ -27,6 +27,8 @@ export interface PluginConfig {
     on_states: AgentState[];
     reuse_pane: boolean;
     default_target: DefaultTargetMode;
+    /** Comparison base for branch reviews; empty means detect one. */
+    base: string;
     watch: boolean;
     /** Passed to `hunk diff` as `--exclude-untracked`. */
     exclude_untracked: boolean;
@@ -56,6 +58,7 @@ export const DEFAULTS: PluginConfig = {
     on_states: ["idle"],
     reuse_pane: true,
     default_target: "auto",
+    base: "",
     watch: false,
     exclude_untracked: false,
     placement: "split",
@@ -115,6 +118,7 @@ export function loadConfig(configDir: string): PluginConfig {
       on_states: subset(r.on_states, AGENT_STATES, DEFAULTS.review.on_states),
       reuse_pane: bool(r.reuse_pane, DEFAULTS.review.reuse_pane),
       default_target: pick(r.default_target, TARGET, DEFAULTS.review.default_target),
+      base: typeof r.base === "string" ? r.base : DEFAULTS.review.base,
       watch: bool(r.watch, DEFAULTS.review.watch),
       exclude_untracked: bool(r.exclude_untracked, DEFAULTS.review.exclude_untracked),
       placement: pick(r.placement, PLACEMENTS, DEFAULTS.review.placement),

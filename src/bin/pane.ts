@@ -7,7 +7,7 @@ import { readContext } from "../context.js";
 import { HerdrAdapter, resolveHunkLauncher } from "../herdr.js";
 import { buildLaunchArgs } from "../hunk.js";
 import { ReviewIndex } from "../index-store.js";
-import { hasCommitsAhead, realRunner, repoRoot, resolveBaseRef } from "../git.js";
+import { realRunner, realTargetDeps } from "../git.js";
 import { sidecarPath } from "../notes.js";
 import { resolveTarget, type Target } from "../target.js";
 import { isMainModule } from "./main-guard.js";
@@ -34,11 +34,7 @@ export function resolveAndRun(
     actionId && isReviewAction(actionId) ? reviewRequestFor(actionId) : { takesRef: false };
 
   const stateDir = env.HERDR_PLUGIN_STATE_DIR ?? ".";
-  const targetDeps = {
-    resolveBaseRef: (repo: string) => resolveBaseRef(repo, realRunner(repo)),
-    hasCommitsAhead: (repo: string, base: string) => hasCommitsAhead(repo, base, realRunner(repo)),
-    repoRoot: (dir: string) => repoRoot(dir, realRunner(dir)),
-  };
+  const targetDeps = realTargetDeps(realRunner);
   let target: Target = resolveTarget({ ...ctx, cwd }, cfg, targetDeps, request.mode);
 
   // Only ref-taking actions consume the value passed through the cross-process index.

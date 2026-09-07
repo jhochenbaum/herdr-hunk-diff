@@ -3,6 +3,7 @@ import type { Placement, PluginConfig } from "./config.js";
 import { reportFailure } from "./herdr.js";
 import type { ReviewIndex } from "./index-store.js";
 import { asObject, asString, parseJsonObject, type JsonObject } from "./json.js";
+import { describeTarget, type Target } from "./target.js";
 
 /**
  * Global manifest hooks. Socket subscriptions require a pane id for agent status events and cannot
@@ -29,8 +30,9 @@ export interface EventDeps {
     closePane: (paneId: string) => void;
   };
   worktreeForPane: (paneId: string) => string | null;
-  /** Re-points an existing review to the worktree's current default target. */
-  reloadReview: (worktree: string) => Promise<void>;
+  resolveTarget: (worktree: string) => Target;
+  reloadReview: (target: Target) => Promise<void>;
+  reportReviewMetadata: (worktree: string) => Promise<void>;
 }
 
 export interface HerdrEvent {
@@ -119,15 +121,23 @@ async function agentStatusChanged(data: JsonObject, deps: EventDeps): Promise<nu
 
   if (!deps.cfg.review.auto_open) return 0;
 
+  const target = deps.resolveTarget(worktree);
+  if (target.warning) deps.herdr.notify(target.warning);
+  const display = {
+    requestedMode: target.mode,
+    requestedRef: null,
+    displayedTarget: describeTarget(target),
+  };
   const existing = deps.index.get(worktree);
   if (deps.cfg.review.reuse_pane && existing?.paneId) {
     try {
-      await deps.reloadReview(worktree);
+      await deps.reloadReview(target);
       deps.index.upsert({
         worktree,
-        requestedMode: null,
+        ...display,
         sent: deps.index.sentIds(worktree),
       });
+      await deps.reportReviewMetadata(worktree);
       return 0;
     } catch {
       // A stale pane id must not prevent a fresh auto-open; preserve delivery history.
@@ -136,17 +146,16 @@ async function agentStatusChanged(data: JsonObject, deps: EventDeps): Promise<nu
   }
 
   const entrypoint = paneEntrypointFor("review");
+  deps.index.upsert({ worktree, ...display, sent: [] });
   const pane = deps.herdr.openPane({
     entrypoint,
     cwd: worktree,
     placement: deps.cfg.review.placement,
     targetPane: paneId,
   });
-  // Plain review entrypoints use the config default, so clear any previously explicit mode.
   deps.index.upsert({
     worktree,
     paneId: pane ?? undefined,
-    requestedMode: null,
     sent: deps.index.sentIds(worktree),
   });
   if (!pane) {
@@ -157,6 +166,7 @@ async function agentStatusChanged(data: JsonObject, deps: EventDeps): Promise<nu
         "`herdr plugin log list` has the open that failed.",
     );
   }
+  await deps.reportReviewMetadata(worktree);
   return 0;
 }
 
