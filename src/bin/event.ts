@@ -7,6 +7,7 @@ import { realRunner, realTargetDeps, repoRoot } from "../git.js";
 import { resolveTarget } from "../target.js";
 import { handleEvent, parseEvent, worktreeForPaneVia, type EventDeps } from "../events.js";
 import { isMainModule } from "./main-guard.js";
+import { reportReviewMetadata } from "../metadata.js";
 
 /** Builds dependencies for one short-lived manifest event-hook process. */
 export interface EventBinDeps {
@@ -19,15 +20,16 @@ const defaultDeps: EventBinDeps = {
     const cfg = loadConfig(env.HERDR_PLUGIN_CONFIG_DIR ?? ".");
     const launcher = resolveHunkLauncher(cfg, env.HERDR_PLUGIN_ROOT ?? process.cwd());
     const hunk = new HunkAdapter(launcher.bin, launcher.prefix);
+    const index = new ReviewIndex(env.HERDR_PLUGIN_STATE_DIR ?? ".");
     return {
       cfg,
-      index: new ReviewIndex(env.HERDR_PLUGIN_STATE_DIR ?? "."),
+      index,
       herdr,
       worktreeForPane: worktreeForPaneVia(herdr, (dir) => repoRoot(dir, realRunner(dir))),
-      reloadReview: (worktree) => {
-        const target = resolveTarget({ cwd: worktree }, cfg, realTargetDeps(realRunner));
-        return hunk.reload(worktree, target, cfg);
-      },
+      resolveTarget: (worktree) =>
+        resolveTarget({ cwd: worktree }, cfg, realTargetDeps(realRunner)),
+      reloadReview: (target) => hunk.reload(target.worktree, target, cfg),
+      reportReviewMetadata: (worktree) => reportReviewMetadata({ index, herdr, hunk }, worktree),
     };
   },
 };

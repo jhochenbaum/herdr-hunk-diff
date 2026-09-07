@@ -30,6 +30,8 @@ export interface ReviewEntry {
   requestedRef?: string | null;
   /** Mode currently displayed, used by reload; `null` restores config-driven selection. */
   requestedMode?: ResolvedTargetMode | null;
+  /** Label of the target last opened or reloaded in the pane. */
+  displayedTarget?: string | null;
   sent: string[];
 }
 

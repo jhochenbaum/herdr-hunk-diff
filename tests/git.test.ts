@@ -8,9 +8,13 @@ import {
   hasCommitsAhead,
   hasWorkingChanges,
   realRunner,
+  realTargetDeps,
   resolveBaseRef,
   type Runner,
 } from "../src/git.js";
+
+import { DEFAULTS } from "../src/config.js";
+import { resolveTarget } from "../src/target.js";
 
 function runner(table: Record<string, { status?: number; stdout?: string }>): Runner {
   return (_cmd, args) => {
@@ -232,6 +236,21 @@ describe("resolveBaseRef against real git", { timeout: 15_000 }, () => {
     git(repo, "commit", "-qam", `work on ${branch}`);
   }
 
+  it("auto detects untracked files even when Git status hides them", () => {
+    const repo = repoWithOrigin();
+    commitOn(repo, "feature", "feature\n");
+    git(repo, "config", "status.showUntrackedFiles", "no");
+    writeFileSync(join(repo, "new.txt"), "new\n");
+    const deps = realTargetDeps(realRunner);
+    expect(resolveTarget({ worktree: repo }, DEFAULTS, deps).mode).toBe("working");
+    const cfg = { ...DEFAULTS, review: { ...DEFAULTS.review, exclude_untracked: true } };
+    expect(resolveTarget({ worktree: repo }, cfg, deps).mode).toBe("branch");
+    writeFileSync(join(repo, "a.txt"), "modified\n");
+    expect(resolveTarget({ worktree: repo }, cfg, deps).mode).toBe("working");
+    git(repo, "add", "a.txt");
+    expect(resolveTarget({ worktree: repo }, cfg, deps).mode).toBe("working");
+  });
+
   it("uses origin/HEAD for a feature branch with no upstream", () => {
     const repo = repoWithOrigin();
     commitOn(repo, "feat/no-upstream", "base\nfeature\n");
@@ -325,24 +344,30 @@ describe("commitExists", () => {
 
 describe("hasWorkingChanges", () => {
   it("reports modified tracked files", () => {
-    const run = runner({ "status --porcelain": { status: 0, stdout: " M src/a.ts\n" } });
+    const run = runner({
+      "status --porcelain --untracked-files=normal": { status: 0, stdout: " M src/a.ts\n" },
+    });
     expect(hasWorkingChanges("/repo", true, run)).toBe(true);
   });
 
   it("reports a clean tree as unchanged", () => {
-    const run = runner({ "status --porcelain": { status: 0, stdout: "\n" } });
+    const run = runner({
+      "status --porcelain --untracked-files=normal": { status: 0, stdout: "\n" },
+    });
     expect(hasWorkingChanges("/repo", true, run)).toBe(false);
   });
 
   it("counts untracked files when they are included", () => {
-    const run = runner({ "status --porcelain": { status: 0, stdout: "?? new.ts\n" } });
+    const run = runner({
+      "status --porcelain --untracked-files=normal": { status: 0, stdout: "?? new.ts\n" },
+    });
     expect(hasWorkingChanges("/repo", true, run)).toBe(true);
   });
 
   it("asks git to omit untracked files when they are excluded", () => {
     const run = runner({
       "status --porcelain --untracked-files=no": { status: 0, stdout: "" },
-      "status --porcelain": { status: 0, stdout: "?? new.ts\n" },
+      "status --porcelain --untracked-files=normal": { status: 0, stdout: "?? new.ts\n" },
     });
     expect(hasWorkingChanges("/repo", false, run)).toBe(false);
   });

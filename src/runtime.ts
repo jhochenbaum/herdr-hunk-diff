@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import { basename } from "node:path";
 import { loadConfig, type PluginConfig, type TargetMode } from "./config.js";
 import { readContext, type HerdrContext } from "./context.js";
 import { HerdrAdapter, reportFailure, resolveHunkLauncher } from "./herdr.js";
@@ -16,6 +15,7 @@ import {
   reviewRequestFor,
   type ReviewActionId,
 } from "./actions.js";
+import { reportReviewMetadata } from "./metadata.js";
 import { DEFAULT_BINDINGS } from "./keys.js";
 import { installKeys, removeKeys, resolveHerdrConfigPath } from "./keys-install.js";
 
@@ -70,25 +70,6 @@ export function buildRuntime(env: NodeJS.ProcessEnv): Runtime {
   };
 }
 
-// Metadata is cosmetic and only applies while a review pane is open.
-async function reportReviewMetadata(rt: Runtime, target: Target): Promise<void> {
-  if (!("reportMetadata" in rt.herdr)) return;
-  const entry = rt.index.get(target.worktree);
-  if (!entry?.paneId) return;
-  const unsentCount = selectUnsent(
-    await rt.hunk.listComments(target.worktree, "user").catch(() => []),
-    rt.index.sentIds(target.worktree),
-  ).length;
-  try {
-    rt.herdr.reportMetadata(entry.paneId, {
-      title: `Review: ${basename(target.worktree)} — ${describeTarget(target)}`,
-      display_agent: unsentCount > 0 ? `hunk (${unsentCount} unsent)` : "hunk",
-    });
-  } catch {
-    // Metadata failures must not fail a completed action.
-  }
-}
-
 /**
  * Records what the pane displays for the separate pane process and later reloads. Store only the
  * caller-supplied ref; derived branch ranges must be resolved again.
@@ -96,10 +77,11 @@ async function reportReviewMetadata(rt: Runtime, target: Target): Promise<void> 
 function displayedReviewRecord(
   target: Target,
   suppliedRef: string | undefined,
-): Pick<ReviewEntry, "requestedMode" | "requestedRef"> {
+): Pick<ReviewEntry, "requestedMode" | "requestedRef" | "displayedTarget"> {
   return {
     requestedRef: suppliedRef ?? null,
     requestedMode: target.mode,
+    displayedTarget: describeTarget(target),
   };
 }
 
@@ -130,7 +112,7 @@ async function reviewAction(actionId: ReviewActionId, rt: Runtime): Promise<numb
         ...displayedReviewRecord(target, suppliedRef),
         sent: [],
       });
-      await reportReviewMetadata(rt, target);
+      await reportReviewMetadata(rt, target.worktree);
       return 0;
     } catch (err) {
       // The pane may be stale; preserve sent history and fall through to a fresh open.
@@ -168,7 +150,7 @@ async function reviewAction(actionId: ReviewActionId, rt: Runtime): Promise<numb
   }
   // The pane id is only available after launch; undefined fields preserve the pre-launch record.
   rt.index.upsert({ worktree: target.worktree, paneId, sent: [] });
-  await reportReviewMetadata(rt, target);
+  await reportReviewMetadata(rt, target.worktree);
   return 0;
 }
 
@@ -240,7 +222,7 @@ async function sendReview(rt: Runtime): Promise<number> {
     }
   }
   rt.herdr.notify(`Sent ${unsent.length} comment(s) to ${label ?? target}.`);
-  await reportReviewMetadata(rt, rt.target);
+  await reportReviewMetadata(rt, worktree);
   return 0;
 }
 
@@ -288,6 +270,13 @@ export async function dispatch(actionId: string, rt: Runtime): Promise<number> {
       } catch (err) {
         return reportFailure(rt.herdr, `Could not reload the review. ${hunkErrorMessage(err)}`);
       }
+      rt.index.upsert({
+        worktree: target.worktree,
+        ...displayedReviewRecord(target, recorded?.requestedRef ?? undefined),
+        sent: [],
+      });
+      if (target.warning) rt.herdr.notify(target.warning);
+      await reportReviewMetadata(rt, target.worktree);
       return 0;
     }
     case "close-review": {

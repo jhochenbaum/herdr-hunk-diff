@@ -14,7 +14,7 @@ export interface TargetDeps {
   hasCommitsAhead: (repo: string, base: string) => boolean;
   /** Resolves repository identity from an arbitrary directory. */
   repoRoot: (dir: string) => string | null;
-  /** Reports uncommitted work, so auto can match `hunk diff` and show it first. */
+  /** Reports tracked changes and, optionally, untracked files. */
   hasWorkingChanges: (repo: string, includeUntracked: boolean) => boolean;
   /** Validates a configured base before it reaches hunk as a range. */
   commitExists: (repo: string, ref: string) => boolean;
@@ -65,7 +65,7 @@ export function resolveTarget(
   const withWarning = (target: Omit<Target, "warning">): Target =>
     warnings.length > 0 ? { ...target, warning: warnings.join(" ") } : target;
 
-  // A configured base beats detection, but only once git confirms it; a typo would reach hunk.
+  // Validate the configured base before constructing a revision range.
   const baseRef = (): string | null => {
     const configured = cfg.review.base.trim();
     if (!configured) return deps.resolveBaseRef(worktree);
@@ -99,7 +99,7 @@ export function resolveTarget(
 
   if (requested !== "auto") return withWarning({ worktree, mode: requested });
 
-  // Uncommitted work wins, matching what bare `hunk diff` and `git diff` show.
+  // Prefer uncommitted changes over the branch diff.
   if (deps.hasWorkingChanges(worktree, !cfg.review.exclude_untracked)) {
     return withWarning({ worktree, mode: "working" });
   }

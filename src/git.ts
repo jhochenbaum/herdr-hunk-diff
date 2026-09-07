@@ -70,16 +70,12 @@ export function commitExists(repo: string, ref: string, run: Runner): boolean {
 
 /** Reports uncommitted work; omitting untracked files mirrors an `--exclude-untracked` review. */
 export function hasWorkingChanges(repo: string, includeUntracked: boolean, run: Runner): boolean {
-  const args = ["status", "--porcelain"];
-  if (!includeUntracked) args.push("--untracked-files=no");
+  const args = ["status", "--porcelain", `--untracked-files=${includeUntracked ? "normal" : "no"}`];
   const r = run("git", args);
   return r.status === 0 && r.stdout.trim().length > 0;
 }
 
-/**
- * One wiring of target resolution over git, shared by every entry point. The runner factory is a
- * parameter so callers keep it observable; resolving it here would hide every git call from tests.
- */
+/** Git dependencies shared by the action, pane, and event entrypoints. */
 export function realTargetDeps(runnerFor: (dir: string) => Runner): TargetDeps {
   return {
     resolveBaseRef: (repo) => resolveBaseRef(repo, runnerFor(repo)),

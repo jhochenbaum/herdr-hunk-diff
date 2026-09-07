@@ -295,6 +295,8 @@ describe("the event hook's auto-open", () => {
         }),
       },
       worktreeForPane: () => WT,
+      resolveTarget: () => resolve(cfg),
+      reportReviewMetadata: vi.fn(async () => {}),
     };
     const payload = {
       event: "pane_agent_status_changed",
@@ -327,18 +329,18 @@ describe("the event hook's auto-open", () => {
     },
   );
 
-  it("corrects the stale mode only after openPane has spawned the pane", async () => {
+  it("records the resolved mode before openPane spawns the pane", async () => {
     const seed = harness(DEFAULTS, { worktree: WT, agentName: "reviewer" });
     expect(await dispatch("review:staged", seed.rt as any)).toBe(0);
 
     const d = hook(DEFAULTS, { dir: seed.dir, index: seed.index });
     await d.fire();
 
-    expect(entryAt(d.spawns[0].index, WT)?.requestedMode).toBe("staged");
-    expect(seed.index.get(WT)?.requestedMode).toBeUndefined();
+    expect(entryAt(d.spawns[0].index, WT)?.requestedMode).toBe("branch");
+    expect(seed.index.get(WT)?.requestedMode).toBe("branch");
   });
 
-  it("keeps a stale commit-ish for a pane that is not showing a commit", async () => {
+  it("clears a stale commit ref when auto-opening the default review", async () => {
     const shared = await paneShowingCommit(DEFAULTS);
     expect(shared.index.get(WT)?.requestedRef).toBe(SHA);
 
@@ -346,8 +348,8 @@ describe("the event hook's auto-open", () => {
     await d.fire();
 
     const record = shared.index.get(WT);
-    expect(record?.requestedMode).toBeUndefined();
-    expect(record?.requestedRef).toBe(SHA);
+    expect(record?.requestedMode).toBe("branch");
+    expect(record?.requestedRef).toBeUndefined();
     expect(
       resolve(DEFAULTS, record?.requestedMode ?? undefined, record?.requestedRef ?? undefined),
     ).toEqual(paneDisplays(DEFAULTS, d.spawns[0]));

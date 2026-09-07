@@ -258,7 +258,7 @@ describe("pane metadata reporting", () => {
     });
   });
 
-  it("also reports metadata after send-review completes", async () => {
+  it("preserves the displayed target when sending comments after config changes", async () => {
     const reportMetadata = vi.fn();
     const rt = runtime({
       herdr: {
@@ -277,12 +277,52 @@ describe("pane metadata reporting", () => {
         navigate: vi.fn(async () => {}),
       },
     });
-    rt.index.upsert({ worktree: "/wt/x", paneId: "w1:p7", sent: [] });
+    rt.index.upsert({
+      worktree: "/wt/x",
+      paneId: "w1:p7",
+      displayedTarget: "commit abc1234",
+      sent: [],
+    });
     expect(await dispatch("send-review", rt as any)).toBe(0);
     expect(reportMetadata).toHaveBeenCalledWith("w1:p7", {
-      title: "Review: x — working tree",
+      title: "Review: x — commit abc1234",
       display_agent: "hunk",
     });
+  });
+
+  it("updates the title after reloading against a changed base", async () => {
+    const rt = runtime();
+    rt.herdr.reportMetadata = vi.fn();
+    rt.index.upsert({
+      worktree: "/wt/x",
+      paneId: "w1:p7",
+      requestedMode: "branch",
+      displayedTarget: "main...HEAD",
+      sent: [],
+    });
+    rt.targetFor = () => ({ worktree: "/wt/x", mode: "branch", ref: "develop...HEAD" });
+    expect(await dispatch("reload", rt as any)).toBe(0);
+    expect(rt.herdr.reportMetadata).toHaveBeenCalledWith("w1:p7", {
+      title: "Review: x — develop...HEAD",
+      display_agent: "hunk",
+    });
+  });
+
+  it("keeps the displayed target after a failed reload", async () => {
+    const rt = runtime();
+    rt.herdr.reportMetadata = vi.fn();
+    rt.index.upsert({
+      worktree: "/wt/x",
+      paneId: "w1:p7",
+      requestedMode: "branch",
+      displayedTarget: "main...HEAD",
+      sent: [],
+    });
+    rt.targetFor = () => ({ worktree: "/wt/x", mode: "branch", ref: "develop...HEAD" });
+    rt.hunk.reload.mockRejectedValue(new Error("reload failed"));
+    expect(await dispatch("reload", rt as any)).toBe(1);
+    expect(rt.index.get("/wt/x")?.displayedTarget).toBe("main...HEAD");
+    expect(rt.herdr.reportMetadata).not.toHaveBeenCalled();
   });
 
   it("silently skips reporting when the herdr adapter has no reportMetadata (older CLI)", async () => {
@@ -591,7 +631,7 @@ describe("setup-keys reporting", () => {
   });
 });
 
-describe("what the pane title says about the review", () => {
+describe("review pane titles", () => {
   const titleFor = async (target: Record<string, unknown>) => {
     const reportMetadata = vi.fn();
     const rt = runtime({
@@ -609,7 +649,7 @@ describe("what the pane title says about the review", () => {
     return reportMetadata.mock.calls[0]?.[1]?.title as string | undefined;
   };
 
-  it("shows the comparison base for a branch review, so it is never a guess", async () => {
+  it("shows the comparison base for a branch review", async () => {
     expect(
       await titleFor({ worktree: "/wt/x", mode: "branch", ref: "origin/develop...HEAD" }),
     ).toBe("Review: x — origin/develop...HEAD");
