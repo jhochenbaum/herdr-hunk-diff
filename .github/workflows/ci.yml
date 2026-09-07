@@ -52,3 +52,43 @@ jobs:
 
       - name: Test
         run: npm test
+
+  # The plugin builds on the user's machine, so the non-npm install path needs its own coverage.
+  pnpm:
+    name: pnpm build path
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Install pnpm
+        run: npm install --global pnpm
+
+      - name: Install dependencies the way the manifest does
+        env:
+          HUNKDIFF_PACKAGE_MANAGER: pnpm
+        run: node scripts/install-deps.mjs
+
+      - name: Build the way the manifest does
+        env:
+          HUNKDIFF_PACKAGE_MANAGER: pnpm
+        run: node scripts/run-script.mjs build
+
+      # pnpm's symlinked layout is what could break this path; the launcher hardcodes it.
+      - name: Launch hunk through the path resolveHunkLauncher builds
+        run: |
+          pinned="$(node -p "require('./package.json').dependencies.hunkdiff")"
+          actual="$(node node_modules/hunkdiff/bin/hunk.cjs --version)"
+          echo "pinned=$pinned actual=$actual"
+          test "$pinned" = "$actual"
+
+      - name: Test
+        env:
+          HUNKDIFF_PACKAGE_MANAGER: pnpm
+        run: node scripts/run-script.mjs test

@@ -34,13 +34,23 @@ https://github.com/user-attachments/assets/a36991a9-288f-4c8a-845c-ce2399334b9b
 
 ## Requirements
 
-| Name      | Version                                   |
-| --------- | ----------------------------------------- |
-| **herdr** | 0.8.0 or newer on macOS, Linux or Windows |
-| **Node**  | 22.12 or newer                            |
+| Name                | Version                                   |
+| ------------------- | ----------------------------------------- |
+| **herdr**           | 0.8.0 or newer on macOS, Linux or Windows |
+| **Node**            | 22.12 or newer                            |
+| **npm** or **pnpm** | Any version, to build the plugin          |
 
 The plugin installs its pinned `hunkdiff` dependency automatically. You do not need a global hunk
 installation for reviews opened inside herdr.
+
+`herdr plugin install` builds the plugin on your machine, which needs a package manager. npm is used
+when it is available, because `package-lock.json` pins the exact dependency tree CI verified;
+otherwise pnpm is used, which resolves the declared ranges instead. `hunkdiff` is pinned to an exact
+version in `package.json`, so the reviewer itself is identical either way. Force one with:
+
+```bash
+HUNKDIFF_PACKAGE_MANAGER=pnpm herdr plugin install jhochenbaum/herdr-hunk-diff
+```
 
 On Windows, hunk ships prebuilt binaries for x64 only, so reviews cannot open on Windows on ARM
 unless `[hunk].bin` points at a hunk you built yourself. Everything else — actions, keybindings and
@@ -438,7 +448,11 @@ npm run build
 npm test
 ```
 
-CI runs formatting, linting, TypeScript compilation, tests, and a high-severity dependency audit.
+pnpm works too — `pnpm install` in place of `npm ci`. Contributions should keep `package-lock.json`
+current, since it is what the release build and CI pin against.
+
+CI runs formatting, linting, TypeScript compilation, tests, and a high-severity dependency audit,
+plus a job that installs and builds through pnpm so the non-npm path stays working.
 
 ## Prior art
 

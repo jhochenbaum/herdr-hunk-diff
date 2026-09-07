@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { parse } from "smol-toml";
 import {
   paneEntrypointFor,
@@ -96,7 +96,23 @@ describe("herdr-plugin.toml", () => {
   });
 
   it("declares a build step that installs dependencies", () => {
-    expect(manifest.build.some((b: any) => b.command.includes("ci"))).toBe(true);
+    expect(manifest.build.some((b: any) => b.command.join(" ").includes("install-deps"))).toBe(
+      true,
+    );
+  });
+
+  it("names no package manager in a build step, so pnpm-only machines can build", () => {
+    for (const step of manifest.build) {
+      expect(step.command[0]).toBe("node");
+      expect(step.command.join(" ")).not.toMatch(/\b(npm|pnpm|yarn|bun)\b/);
+    }
+  });
+
+  it("runs every build step through a script that exists", () => {
+    for (const step of manifest.build) {
+      const script = step.command.find((c: string) => c.endsWith(".mjs"));
+      expect(existsSync(script), script).toBe(true);
+    }
   });
 
   it("declares the review pane as a split by default", () => {

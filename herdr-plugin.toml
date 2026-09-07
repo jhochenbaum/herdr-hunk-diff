@@ -7,12 +7,13 @@ min_herdr_version = "0.8.0"
 description = "Review agent-authored diffs in hunk, and send your inline comments back to the agent that wrote them."
 platforms = ["macos", "linux", "windows"]
 
-# Build steps inherit the top-level platforms.
+# Build steps inherit the top-level platforms. They dispatch through node rather than naming a
+# package manager, so a machine with pnpm but no npm can still build the plugin.
 [[build]]
-command = ["npm", "ci"]
+command = ["node", "scripts/install-deps.mjs"]
 
 [[build]]
-command = ["npm", "run", "build"]
+command = ["node", "scripts/run-script.mjs", "build"]
 
 # Global socket subscriptions require a pane id, so each event runs a short-lived manifest hook.
 # Herdr runs hooks from the plugin root, so direct argv needs no shell expansion.
