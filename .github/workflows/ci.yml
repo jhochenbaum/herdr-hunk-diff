@@ -37,7 +37,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: node scripts/install-deps.mjs
 
       - name: Audit dependencies
         if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
@@ -48,7 +48,50 @@ jobs:
         run: npm run check
 
       - name: Build
-        run: npm run build
+        run: node scripts/run-script.mjs build
 
       - name: Test
         run: npm test
+
+  pnpm:
+    name: pnpm ${{ matrix.pnpm }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        pnpm: ["10", "12"]
+    env:
+      HUNKDIFF_PACKAGE_MANAGER: pnpm
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Install pnpm
+        run: npm install --global pnpm@${{ matrix.pnpm }}
+
+      - name: Install dependencies
+        run: node scripts/install-deps.mjs
+
+      - name: Build
+        run: node scripts/run-script.mjs build
+
+      - name: Verify bundled Hunk launcher
+        run: >-
+          node --input-type=module -e '
+          import { execFileSync } from "node:child_process";
+          import { readFileSync } from "node:fs";
+          import assert from "node:assert/strict";
+          const pinned = JSON.parse(readFileSync("package.json", "utf8")).dependencies.hunkdiff;
+          const actual = execFileSync(process.execPath, ["node_modules/hunkdiff/bin/hunk.cjs", "--version"], { encoding: "utf8" }).trim();
+          assert.equal(actual, pinned);
+          console.log("Hunk " + actual);'
+
+      - name: Test
+        run: node scripts/run-script.mjs test

@@ -34,13 +34,21 @@ https://github.com/user-attachments/assets/a36991a9-288f-4c8a-845c-ce2399334b9b
 
 ## Requirements
 
-| Name      | Version                                   |
-| --------- | ----------------------------------------- |
-| **herdr** | 0.8.0 or newer on macOS, Linux or Windows |
-| **Node**  | 22.12 or newer                            |
+| Name                | Version                                   |
+| ------------------- | ----------------------------------------- |
+| **herdr**           | 0.8.0 or newer on macOS, Linux or Windows |
+| **Node**            | 22.12 or newer                            |
+| **npm** or **pnpm** | npm 10+ or pnpm 10+                       |
 
 The plugin installs its pinned `hunkdiff` dependency automatically. You do not need a global hunk
 installation for reviews opened inside herdr.
+
+Installation uses npm when available, falling back to pnpm. Set `HUNKDIFF_PACKAGE_MANAGER`
+to `npm` or `pnpm` to choose explicitly:
+
+```bash
+HUNKDIFF_PACKAGE_MANAGER=pnpm herdr plugin install jhochenbaum/herdr-hunk-diff
+```
 
 On Windows, hunk ships prebuilt binaries for x64 only, so reviews cannot open on Windows on ARM
 unless `[hunk].bin` points at a hunk you built yourself. Everything else — actions, keybindings and
@@ -456,7 +464,22 @@ npm run build
 npm test
 ```
 
-CI runs formatting, linting, TypeScript compilation, tests, and a high-severity dependency audit.
+For pnpm:
+
+```bash
+pnpm install --ignore-scripts
+pnpm run format:check
+pnpm run lint
+pnpm run build
+pnpm test
+```
+
+Keep `package-lock.json` current when changing dependencies. npm installs use this lockfile;
+pnpm resolves the ranges in `package.json`. Both use the same pinned Hunk version.
+The pnpm path skips dependency build scripts and uses Hunk's prebuilt platform binary.
+
+CI checks formatting, lint, TypeScript compilation, tests, and dependency vulnerabilities.
+It also verifies installation, builds, and the Hunk launcher with npm and pnpm on Linux and Windows.
 
 ## Prior art
 

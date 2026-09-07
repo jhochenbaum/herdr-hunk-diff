@@ -9,10 +9,10 @@ platforms = ["macos", "linux", "windows"]
 
 # Build steps inherit the top-level platforms.
 [[build]]
-command = ["npm", "ci"]
+command = ["node", "scripts/install-deps.mjs"]
 
 [[build]]
-command = ["npm", "run", "build"]
+command = ["node", "scripts/run-script.mjs", "build"]
 
 # Global socket subscriptions require a pane id, so each event runs a short-lived manifest hook.
 # Herdr runs hooks from the plugin root, so direct argv needs no shell expansion.
