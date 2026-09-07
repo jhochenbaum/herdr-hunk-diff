@@ -45,8 +45,10 @@ installation for reviews opened inside herdr.
 
 `herdr plugin install` builds the plugin on your machine, which needs a package manager. npm is used
 when it is available, because `package-lock.json` pins the exact dependency tree CI verified;
-otherwise pnpm is used, which resolves the declared ranges instead. `hunkdiff` is pinned to an exact
-version in `package.json`, so the reviewer itself is identical either way. Force one with:
+otherwise pnpm is used, which resolves the declared ranges instead. The pnpm install passes
+`--ignore-scripts`, since no dependency needs a postinstall and pnpm 12 fails an install that skips
+one. `hunkdiff` is pinned to an exact version in `package.json`, so the reviewer itself is identical
+either way. Force one with:
 
 ```bash
 HUNKDIFF_PACKAGE_MANAGER=pnpm herdr plugin install jhochenbaum/herdr-hunk-diff

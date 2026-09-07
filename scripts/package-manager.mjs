@@ -10,7 +10,9 @@ export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 /** Frozen installs first: they reproduce a lockfile instead of re-resolving ranges. */
 export const MANAGERS = {
   npm: { install: existsSync(join(ROOT, "package-lock.json")) ? ["ci"] : ["install"] },
-  pnpm: { install: ["install"] },
+  // pnpm blocks dependency build scripts and, since pnpm 12, fails the install over them. Asking
+  // for it explicitly succeeds: hunk runs its prebuilt binary, so no dependency needs a postinstall.
+  pnpm: { install: ["install", "--ignore-scripts"] },
 };
 
 export const OVERRIDE = "HUNKDIFF_PACKAGE_MANAGER";
