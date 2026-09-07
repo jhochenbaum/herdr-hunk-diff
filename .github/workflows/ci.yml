@@ -37,7 +37,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: node scripts/install-deps.mjs
 
       - name: Audit dependencies
         if: matrix.os == 'ubuntu-latest' && matrix.node == '24'
@@ -48,15 +48,21 @@ jobs:
         run: npm run check
 
       - name: Build
-        run: npm run build
+        run: node scripts/run-script.mjs build
 
       - name: Test
         run: npm test
 
-  # The plugin builds on the user's machine, so the non-npm install path needs its own coverage.
   pnpm:
-    name: pnpm build path
-    runs-on: ubuntu-latest
+    name: pnpm ${{ matrix.pnpm }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        pnpm: ["10", "12"]
+    env:
+      HUNKDIFF_PACKAGE_MANAGER: pnpm
 
     steps:
       - name: Check out repository
@@ -68,27 +74,24 @@ jobs:
           node-version: "24"
 
       - name: Install pnpm
-        run: npm install --global pnpm
+        run: npm install --global pnpm@${{ matrix.pnpm }}
 
-      - name: Install dependencies the way the manifest does
-        env:
-          HUNKDIFF_PACKAGE_MANAGER: pnpm
+      - name: Install dependencies
         run: node scripts/install-deps.mjs
 
-      - name: Build the way the manifest does
-        env:
-          HUNKDIFF_PACKAGE_MANAGER: pnpm
+      - name: Build
         run: node scripts/run-script.mjs build
 
-      # pnpm's symlinked layout is what could break this path; the launcher hardcodes it.
-      - name: Launch hunk through the path resolveHunkLauncher builds
-        run: |
-          pinned="$(node -p "require('./package.json').dependencies.hunkdiff")"
-          actual="$(node node_modules/hunkdiff/bin/hunk.cjs --version)"
-          echo "pinned=$pinned actual=$actual"
-          test "$pinned" = "$actual"
+      - name: Verify bundled Hunk launcher
+        run: >-
+          node --input-type=module -e '
+          import { execFileSync } from "node:child_process";
+          import { readFileSync } from "node:fs";
+          import assert from "node:assert/strict";
+          const pinned = JSON.parse(readFileSync("package.json", "utf8")).dependencies.hunkdiff;
+          const actual = execFileSync(process.execPath, ["node_modules/hunkdiff/bin/hunk.cjs", "--version"], { encoding: "utf8" }).trim();
+          assert.equal(actual, pinned);
+          console.log("Hunk " + actual);'
 
       - name: Test
-        env:
-          HUNKDIFF_PACKAGE_MANAGER: pnpm
         run: node scripts/run-script.mjs test

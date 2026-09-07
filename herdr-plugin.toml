@@ -7,8 +7,7 @@ min_herdr_version = "0.8.0"
 description = "Review agent-authored diffs in hunk, and send your inline comments back to the agent that wrote them."
 platforms = ["macos", "linux", "windows"]
 
-# Build steps inherit the top-level platforms. They dispatch through node rather than naming a
-# package manager, so a machine with pnpm but no npm can still build the plugin.
+# Build steps inherit the top-level platforms.
 [[build]]
 command = ["node", "scripts/install-deps.mjs"]
 

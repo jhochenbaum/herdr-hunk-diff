@@ -38,17 +38,13 @@ https://github.com/user-attachments/assets/a36991a9-288f-4c8a-845c-ce2399334b9b
 | ------------------- | ----------------------------------------- |
 | **herdr**           | 0.8.0 or newer on macOS, Linux or Windows |
 | **Node**            | 22.12 or newer                            |
-| **npm** or **pnpm** | Any version, to build the plugin          |
+| **npm** or **pnpm** | npm 10+ or pnpm 10+                       |
 
 The plugin installs its pinned `hunkdiff` dependency automatically. You do not need a global hunk
 installation for reviews opened inside herdr.
 
-`herdr plugin install` builds the plugin on your machine, which needs a package manager. npm is used
-when it is available, because `package-lock.json` pins the exact dependency tree CI verified;
-otherwise pnpm is used, which resolves the declared ranges instead. The pnpm install passes
-`--ignore-scripts`, since no dependency needs a postinstall and pnpm 12 fails an install that skips
-one. `hunkdiff` is pinned to an exact version in `package.json`, so the reviewer itself is identical
-either way. Force one with:
+Installation uses npm when available, falling back to pnpm. Set `HUNKDIFF_PACKAGE_MANAGER`
+to `npm` or `pnpm` to choose explicitly:
 
 ```bash
 HUNKDIFF_PACKAGE_MANAGER=pnpm herdr plugin install jhochenbaum/herdr-hunk-diff
@@ -450,11 +446,22 @@ npm run build
 npm test
 ```
 
-pnpm works too — `pnpm install` in place of `npm ci`. Contributions should keep `package-lock.json`
-current, since it is what the release build and CI pin against.
+For pnpm:
 
-CI runs formatting, linting, TypeScript compilation, tests, and a high-severity dependency audit,
-plus a job that installs and builds through pnpm so the non-npm path stays working.
+```bash
+pnpm install --ignore-scripts
+pnpm run format:check
+pnpm run lint
+pnpm run build
+pnpm test
+```
+
+Keep `package-lock.json` current when changing dependencies. npm installs use this lockfile;
+pnpm resolves the ranges in `package.json`. Both use the same pinned Hunk version.
+The pnpm path skips dependency build scripts and uses Hunk's prebuilt platform binary.
+
+CI checks formatting, lint, TypeScript compilation, tests, and dependency vulnerabilities.
+It also verifies installation, builds, and the Hunk launcher with npm and pnpm on Linux and Windows.
 
 ## Prior art
 

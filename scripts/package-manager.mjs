@@ -1,5 +1,3 @@
-// Picks the package manager the plugin builds with. npm is preferred because package-lock.json is
-// the tree CI verifies; other managers re-resolve ranges, so they are a fallback, not a default.
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -7,18 +5,17 @@ import { fileURLToPath } from "node:url";
 
 export const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
-/** Frozen installs first: they reproduce a lockfile instead of re-resolving ranges. */
+// Prefer the committed npm lockfile.
 export const MANAGERS = {
   npm: { install: existsSync(join(ROOT, "package-lock.json")) ? ["ci"] : ["install"] },
-  // pnpm blocks dependency build scripts and, since pnpm 12, fails the install over them. Asking
-  // for it explicitly succeeds: hunk runs its prebuilt binary, so no dependency needs a postinstall.
+  // Hunk uses a prebuilt binary; pnpm 12 requires explicitly skipping dependency scripts.
   pnpm: { install: ["install", "--ignore-scripts"] },
 };
 
-export const OVERRIDE = "HUNKDIFF_PACKAGE_MANAGER";
+const OVERRIDE = "HUNKDIFF_PACKAGE_MANAGER";
 
 /** Windows resolves `npm`/`pnpm` through .cmd shims, which need a shell to execute. */
-export const SHELL = process.platform === "win32";
+const SHELL = process.platform === "win32";
 
 export function run(manager, args) {
   return spawnSync(manager, args, { cwd: ROOT, stdio: "inherit", shell: SHELL });
@@ -36,7 +33,7 @@ const eitherOf = () => Object.keys(MANAGERS).join(" or ");
 export function detect() {
   const requested = process.env[OVERRIDE]?.trim();
   if (requested) {
-    if (!(requested in MANAGERS)) {
+    if (!Object.hasOwn(MANAGERS, requested)) {
       console.error(
         `hunkdiff: ${OVERRIDE}="${requested}" is not supported; use one of ${supported()}.`,
       );

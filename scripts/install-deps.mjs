@@ -1,4 +1,3 @@
-// Build step 1: install dependencies with whichever supported package manager is present.
 import { detect, MANAGERS, run } from "./package-manager.mjs";
 
 const manager = detect();
