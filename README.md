@@ -344,6 +344,15 @@ a separately installed binary.
 agent notes. `extra_args` appends string arguments to every hunk launch. If any list item is not a
 string, the entire list is rejected to avoid constructing a partial command.
 
+With `bin = "auto"`, if the review's worktree does not exist on this filesystem — for example, an
+agent working inside a [Docker Sandbox](https://docs.docker.com/ai/sandboxes/) `--clone` checkout
+that never left the container — the plugin looks for a sandbox whose workspace contains that path
+(via `sbx ls --json`) and runs hunk there instead, through `sbx exec <sandbox> -- hunk`. This
+assumes hunk is installed globally inside the sandbox (see
+[Optional VCS pager setup](#optional-vcs-pager-setup)). Any failure along that path — `sbx` not
+installed, no matching sandbox, an unreadable `sbx ls` response — falls back to the bundled local
+hunk unchanged.
+
 ## Optional VCS pager setup
 
 Pager setup is independent of reviews inside herdr. It makes commands such as `git diff`, `git log`,

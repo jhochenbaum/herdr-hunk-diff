@@ -2,27 +2,87 @@ import { describe, expect, it } from "vitest";
 import { join } from "node:path";
 import { DEFAULTS } from "../src/config.js";
 import { HerdrAdapter, resolveHunkLauncher } from "../src/herdr.js";
+import type { SandboxLookup } from "../src/sandbox.js";
+
+/** Worktree "exists" locally, so these tests never reach for a sandbox. */
+const LOCAL_LOOKUP: SandboxLookup = { exists: () => true, listSandboxes: () => [] };
 
 describe("resolveHunkLauncher", () => {
   it("prefers the bundled hunkdiff when bin is auto", () => {
-    expect(resolveHunkLauncher(DEFAULTS, "/plugin", "/bin/node")).toEqual({
+    expect(resolveHunkLauncher(DEFAULTS, "/plugin", "/wt", "/bin/node", LOCAL_LOOKUP)).toEqual({
       bin: "/bin/node",
       prefix: [join("/plugin", "node_modules", "hunkdiff", "bin", "hunk.cjs")],
     });
   });
 
   it("runs it under this process's own node by default", () => {
-    expect(resolveHunkLauncher(DEFAULTS, "/plugin").bin).toBe(process.execPath);
+    expect(resolveHunkLauncher(DEFAULTS, "/plugin", "/wt", undefined, LOCAL_LOOKUP).bin).toBe(
+      process.execPath,
+    );
   });
 
   it("never reaches for the node_modules/.bin shim", () => {
-    const { bin, prefix } = resolveHunkLauncher(DEFAULTS, "/plugin");
+    const { bin, prefix } = resolveHunkLauncher(
+      DEFAULTS,
+      "/plugin",
+      "/wt",
+      undefined,
+      LOCAL_LOOKUP,
+    );
     expect([bin, ...prefix].join(" ")).not.toContain(".bin");
   });
 
   it("honours an explicit binary path, spawning it with no launcher in front", () => {
     const cfg = { ...DEFAULTS, hunk: { ...DEFAULTS.hunk, bin: "/usr/local/bin/hunk" } };
-    expect(resolveHunkLauncher(cfg, "/plugin")).toEqual({ bin: "/usr/local/bin/hunk", prefix: [] });
+    expect(resolveHunkLauncher(cfg, "/plugin", "/wt")).toEqual({
+      bin: "/usr/local/bin/hunk",
+      prefix: [],
+    });
+  });
+
+  describe("Docker Sandbox fallback", () => {
+    it("routes through sbx exec when the worktree only exists inside a matching sandbox", () => {
+      const lookup: SandboxLookup = {
+        exists: () => false,
+        listSandboxes: () => [{ name: "my-sandbox", workspace: "/wt/project" }],
+      };
+      expect(resolveHunkLauncher(DEFAULTS, "/plugin", "/wt/project", "/bin/node", lookup)).toEqual({
+        bin: "sbx",
+        prefix: ["exec", "my-sandbox", "hunk"],
+      });
+    });
+
+    it("falls back to local hunk when no sandbox matches", () => {
+      const lookup: SandboxLookup = { exists: () => false, listSandboxes: () => [] };
+      expect(resolveHunkLauncher(DEFAULTS, "/plugin", "/wt/project", "/bin/node", lookup)).toEqual({
+        bin: "/bin/node",
+        prefix: [join("/plugin", "node_modules", "hunkdiff", "bin", "hunk.cjs")],
+      });
+    });
+
+    it("falls back to local hunk when sbx itself is unavailable", () => {
+      const lookup: SandboxLookup = {
+        exists: () => false,
+        listSandboxes: () => {
+          throw new Error("spawn sbx ENOENT");
+        },
+      };
+      expect(resolveHunkLauncher(DEFAULTS, "/plugin", "/wt/project", "/bin/node", lookup).bin).toBe(
+        "/bin/node",
+      );
+    });
+
+    it("does not consult sbx at all when the worktree already exists locally", () => {
+      let called = false;
+      resolveHunkLauncher(DEFAULTS, "/plugin", "/wt", "/bin/node", {
+        exists: () => true,
+        listSandboxes: () => {
+          called = true;
+          return [];
+        },
+      });
+      expect(called).toBe(false);
+    });
   });
 });
 

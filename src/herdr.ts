@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Placement, PluginConfig } from "./config.js";
 import { asObject, asString, parseJsonObject, type JsonObject } from "./json.js";
 import { PLUGIN_ID } from "./keys.js";
+import { findSandboxForPath, realSandboxLookup, type SandboxLookup } from "./sandbox.js";
 
 export type CliRunner = (args: string[]) => { status: number; stdout: string };
 
@@ -26,17 +27,36 @@ export interface HunkLauncher {
   prefix: string[];
 }
 
-/** Runs the bundled launcher with Node, bypassing platform-specific npm shims. */
+/**
+ * Runs the bundled launcher with Node, bypassing platform-specific npm shims. When `worktree`
+ * does not exist on this filesystem, the review most likely lives inside a Docker Sandbox whose
+ * checkout never left the container (e.g. a `--clone` sandbox). In that case, look for a sandbox
+ * whose workspace contains it and route the call through `sbx exec` instead, assuming a global
+ * `hunk` install inside the sandbox (see README's pager setup section). Any failure along that
+ * path — `sbx` missing, no matching sandbox, a malformed `sbx ls` response — falls back to the
+ * bundled local launcher unchanged.
+ */
 export function resolveHunkLauncher(
   cfg: PluginConfig,
   pluginRoot: string,
+  worktree: string,
   execPath: string = process.execPath,
+  lookup: SandboxLookup = realSandboxLookup,
 ): HunkLauncher {
   if (cfg.hunk.bin !== "auto") return { bin: cfg.hunk.bin, prefix: [] };
-  return {
+
+  const local: HunkLauncher = {
     bin: execPath,
     prefix: [join(pluginRoot, "node_modules", "hunkdiff", "bin", "hunk.cjs")],
   };
+
+  try {
+    if (lookup.exists(worktree)) return local;
+    const sandbox = findSandboxForPath(worktree, lookup.listSandboxes());
+    return sandbox ? { bin: "sbx", prefix: ["exec", sandbox, "hunk"] } : local;
+  } catch {
+    return local;
+  }
 }
 
 export class HerdrAdapter {

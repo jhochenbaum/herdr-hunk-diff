@@ -52,7 +52,7 @@ export function buildRuntime(env: NodeJS.ProcessEnv): Runtime {
   };
 
   const stateDir = env.HERDR_PLUGIN_STATE_DIR ?? ".";
-  const hunkLauncher = resolveHunkLauncher(cfg, pluginRoot);
+  let hunkAdapter: HunkAdapter | undefined;
 
   return {
     cfg,
@@ -61,7 +61,15 @@ export function buildRuntime(env: NodeJS.ProcessEnv): Runtime {
     stateDir,
     index: new ReviewIndex(stateDir),
     herdr: new HerdrAdapter(env.HERDR_BIN_PATH ?? "herdr"),
-    hunk: new HunkAdapter(hunkLauncher.bin, hunkLauncher.prefix),
+    // Deferred: choosing a launcher needs the resolved worktree, and resolving it must not
+    // force a git subprocess for actions that never touch hunk (see runtime-lazy-target.test.ts).
+    get hunk(): Pick<HunkAdapter, "listComments" | "removeComment" | "reload" | "navigate"> {
+      if (!hunkAdapter) {
+        const launcher = resolveHunkLauncher(cfg, pluginRoot, targetFor().worktree);
+        hunkAdapter = new HunkAdapter(launcher.bin, launcher.prefix);
+      }
+      return hunkAdapter;
+    },
     targetFor,
     commitExists: (repo, ref) => commitExists(repo, ref, realRunner(repo)),
     get target(): Target {

@@ -18,8 +18,13 @@ const defaultDeps: EventBinDeps = {
   buildDeps: (env) => {
     const herdr = new HerdrAdapter(env.HERDR_BIN_PATH ?? "herdr");
     const cfg = loadConfig(env.HERDR_PLUGIN_CONFIG_DIR ?? ".");
-    const launcher = resolveHunkLauncher(cfg, env.HERDR_PLUGIN_ROOT ?? process.cwd());
-    const hunk = new HunkAdapter(launcher.bin, launcher.prefix);
+    const pluginRoot = env.HERDR_PLUGIN_ROOT ?? process.cwd();
+    // Resolved per worktree: which launcher applies can differ across the events one process
+    // may see, and the choice depends on that worktree's own resolution (see resolveHunkLauncher).
+    const hunkFor = (worktree: string): HunkAdapter => {
+      const launcher = resolveHunkLauncher(cfg, pluginRoot, worktree);
+      return new HunkAdapter(launcher.bin, launcher.prefix);
+    };
     const index = new ReviewIndex(env.HERDR_PLUGIN_STATE_DIR ?? ".");
     return {
       cfg,
@@ -28,8 +33,9 @@ const defaultDeps: EventBinDeps = {
       worktreeForPane: worktreeForPaneVia(herdr, (dir) => repoRoot(dir, realRunner(dir))),
       resolveTarget: (worktree) =>
         resolveTarget({ cwd: worktree }, cfg, realTargetDeps(realRunner)),
-      reloadReview: (target) => hunk.reload(target.worktree, target, cfg),
-      reportReviewMetadata: (worktree) => reportReviewMetadata({ index, herdr, hunk }, worktree),
+      reloadReview: (target) => hunkFor(target.worktree).reload(target.worktree, target, cfg),
+      reportReviewMetadata: (worktree) =>
+        reportReviewMetadata({ index, herdr, hunk: hunkFor(worktree) }, worktree),
     };
   },
 };
