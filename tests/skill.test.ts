@@ -42,7 +42,9 @@ describe("skills/hunk-herdr-review/SKILL.md", () => {
     });
 
     it("derives the binary from that root, and bakes in no absolute path of its own", () => {
-      expect(SKILL).toContain("node_modules/.bin/hunk");
+      // npm links only the `hunkdiff` shim; `.bin/hunk` exists under pnpm alone.
+      expect(SKILL).toContain('node_modules/.bin/hunkdiff"');
+      expect(SKILL).not.toContain('node_modules/.bin/hunk"');
       expect(SKILL).not.toMatch(/\/Users\//);
       expect(SKILL).not.toMatch(/\.config\/herdr\/plugins/);
     });

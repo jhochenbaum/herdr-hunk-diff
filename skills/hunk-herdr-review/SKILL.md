@@ -22,7 +22,7 @@ inside that plugin's install directory. Assume any bare `hunk ...` command you w
 
 ```bash
 plugin_root="$(herdr plugin list --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=(JSON.parse(s).result.plugins||[]).find(p=>p.plugin_id==="jhochenbaum.hunkdiff");process.stdout.write(p&&p.plugin_root||"")})')"
-hunk="$plugin_root/node_modules/.bin/hunk"
+hunk="$plugin_root/node_modules/.bin/hunkdiff"
 test -x "$hunk" || echo "jhochenbaum.hunkdiff is not installed; report your notes in your reply instead"
 ```
 
