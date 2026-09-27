@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-import { spawnSync, type SpawnSyncReturns } from "node:child_process";
+import { spawn as spawnAsync, spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { readFileSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { isReviewAction, reviewRequestFor, type ReviewRequest } from "../actions.js";
 import { loadConfig } from "../config.js";
 import { readContext } from "../context.js";
@@ -9,6 +11,8 @@ import { buildLaunchArgs } from "../hunk.js";
 import { ReviewIndex } from "../index-store.js";
 import { realRunner, realTargetDeps } from "../git.js";
 import { sidecarPath } from "../notes.js";
+import { loadSavedComments } from "../saved-comments.js";
+import { selectUnsent } from "../courier.js";
 import { resolveTarget, type Target } from "../target.js";
 import { isMainModule } from "./main-guard.js";
 
@@ -18,6 +22,24 @@ export type SpawnFn = (
   opts: { stdio: "inherit"; cwd: string },
 ) => Pick<SpawnSyncReturns<Buffer>, "status">;
 
+/** Starts saving the worktree's unsent comments and returns a function that stops it. */
+export type WatchFn = (worktree: string, env: NodeJS.ProcessEnv) => () => void;
+
+const noWatch: WatchFn = () => () => {};
+
+/** Runs the comment snapshotter beside hunk, since spawnSync blocks this process meanwhile. */
+export const realWatch: WatchFn = (worktree, env) => {
+  const script = join(dirname(fileURLToPath(import.meta.url)), "comment-watch.js");
+  const child = spawnAsync(process.execPath, [script, worktree, String(process.pid)], {
+    env,
+    stdio: "ignore",
+  });
+  child.on("error", () => {
+    // Saving comments is best effort; the review itself must still open.
+  });
+  return () => child.kill();
+};
+
 /** Resolves the action-encoded target and launches hunk from its canonical worktree. */
 export function resolveAndRun(
   env: NodeJS.ProcessEnv,
@@ -26,6 +48,7 @@ export function resolveAndRun(
   actionId?: string,
   notify: (message: string) => void = (m) =>
     new HerdrAdapter(env.HERDR_BIN_PATH ?? "herdr").notify(m),
+  watch: WatchFn = noWatch,
 ): number {
   const cfg = loadConfig(env.HERDR_PLUGIN_CONFIG_DIR ?? ".");
   const ctx = readContext(env);
@@ -57,6 +80,7 @@ export function resolveAndRun(
   }
 
   const launcher = resolveHunkLauncher(cfg, env.HERDR_PLUGIN_ROOT ?? cwd);
+  const stopWatch = watch(target.worktree, env);
   const result = spawn(
     launcher.bin,
     [...launcher.prefix, ...buildLaunchArgs(target, cfg, sidecar)],
@@ -65,6 +89,19 @@ export function resolveAndRun(
       cwd: target.worktree,
     },
   );
+
+  stopWatch();
+
+  const unsent = selectUnsent(
+    loadSavedComments(stateDir, target.worktree),
+    new ReviewIndex(stateDir).sentIds(target.worktree),
+  );
+  if (unsent.length > 0) {
+    notify(
+      `hunk closed with ${unsent.length} unsent review comment(s). They were saved; ` +
+        `run send-review to deliver them.`,
+    );
+  }
 
   // hunk's own stderr dies with the pane herdr closes on a non-zero exit, so report it out of band.
   if (result.status !== 0) {
@@ -87,5 +124,7 @@ export function resolveAndRun(
 }
 
 if (isMainModule(import.meta.url)) {
-  process.exit(resolveAndRun(process.env, process.cwd(), spawnSync, process.argv[2]));
+  process.exit(
+    resolveAndRun(process.env, process.cwd(), spawnSync, process.argv[2], undefined, realWatch),
+  );
 }

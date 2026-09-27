@@ -115,6 +115,11 @@ remain in the review for context.
 Successfully delivered comments are removed from hunk by default, and their IDs are recorded so
 they cannot be sent twice.
 
+If you close the review before sending, your unsent comments are not lost. The plugin saves them
+every few seconds while hunk is open and tells you when it closes with comments still unsent. Run
+`send-review` afterwards, with or without the review open, to deliver them. Comments typed in the
+last few seconds before closing may not have been saved yet.
+
 > [!NOTE]
 > Reviews do not open automatically by default. See [Automatic opening](#automatic-opening) to opt
 > in.
@@ -450,7 +455,8 @@ Invalid TOML and invalid values fall back to defaults.
 
 - Review actions cannot receive pathspecs, patch paths, file pairs, or arbitrary revisions.
 - Stash reviews cannot be reloaded in place; close and reopen them.
-- Sending comments is explicit through `send-review`; closing a pane does not send them.
+- Sending comments is explicit through `send-review`; closing a pane saves them but does not send
+  them, and saved comments are not shown again in a reopened review.
 - GitHub links support commits already present locally, not pull requests.
 - Agent-authored notes require a live hunk session. The bundled
   [`hunk-herdr-review` skill](skills/hunk-herdr-review/SKILL.md) documents that workflow.

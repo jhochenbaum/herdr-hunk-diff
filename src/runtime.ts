@@ -2,9 +2,16 @@ import { spawnSync } from "node:child_process";
 import { loadConfig, type PluginConfig, type TargetMode } from "./config.js";
 import { readContext, type HerdrContext } from "./context.js";
 import { HerdrAdapter, reportFailure, resolveHunkLauncher } from "./herdr.js";
-import { canReload, HunkAdapter, HunkProtocolError, HunkUnavailableError } from "./hunk.js";
+import {
+  canReload,
+  HunkAdapter,
+  HunkProtocolError,
+  HunkUnavailableError,
+  type HunkComment,
+} from "./hunk.js";
 import { ReviewIndex, type ReviewEntry } from "./index-store.js";
 import { formatReview, selectUnsent } from "./courier.js";
+import { forgetSavedComments, loadSavedComments } from "./saved-comments.js";
 import { parseGithubUrl } from "./notes.js";
 import { installPager, realPagerEffects, uninstallPager } from "./pager.js";
 import { describeTarget, resolveTarget, type Target } from "./target.js";
@@ -175,18 +182,25 @@ function commitRefFromContext(actionId: ReviewActionId, rt: Runtime): string | u
 
 async function sendReview(rt: Runtime): Promise<number> {
   const worktree = rt.target.worktree;
-  let comments;
+  // Comments saved from a closed viewer are delivered alongside the live session's (#37).
+  const saved = loadSavedComments(rt.stateDir, worktree);
+  let live: HunkComment[] = [];
   try {
-    comments = await rt.hunk.listComments(worktree, "user");
+    live = await rt.hunk.listComments(worktree, "user");
   } catch (err) {
-    return reportFailure(
-      rt.herdr,
-      err instanceof HunkUnavailableError || err instanceof HunkProtocolError
-        ? err.message
-        : "hunk session unavailable.",
-    );
+    const noSession = err instanceof HunkUnavailableError && err.reason === "no-session";
+    if (!noSession || saved.length === 0) {
+      return reportFailure(
+        rt.herdr,
+        err instanceof HunkUnavailableError || err instanceof HunkProtocolError
+          ? err.message
+          : "hunk session unavailable.",
+      );
+    }
   }
 
+  const liveIds = new Set(live.map((c) => c.noteId));
+  const comments = [...saved.filter((c) => !liveIds.has(c.noteId)), ...live];
   const unsent = selectUnsent(comments, rt.index.sentIds(worktree));
   if (unsent.length === 0) {
     rt.herdr.notify("No new review comments to send.");
@@ -210,8 +224,13 @@ async function sendReview(rt: Runtime): Promise<number> {
     worktree,
     unsent.map((c) => c.noteId),
   );
+  forgetSavedComments(
+    rt.stateDir,
+    worktree,
+    unsent.map((c) => c.noteId),
+  );
   if (rt.cfg.roundtrip.clear_after_send) {
-    for (const c of unsent) {
+    for (const c of unsent.filter((c) => liveIds.has(c.noteId))) {
       try {
         await rt.hunk.removeComment(worktree, c.noteId);
       } catch {
