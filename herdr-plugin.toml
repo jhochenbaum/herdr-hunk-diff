@@ -32,7 +32,10 @@ command = ["node", "dist/bin/event.js"]
 on = "worktree.removed"
 command = ["node", "dist/bin/event.js"]
 
-# Panes run from the reviewed worktree, so a platform shell expands HERDR_PLUGIN_ROOT.
+# Panes run from the reviewed worktree, so the plugin root comes from HERDR_PLUGIN_ROOT.
+# POSIX panes expand it with sh. Windows panes read it in node instead of cmd: Windows argv
+# quoting escapes embedded quotes as \" which cmd does not parse, and an unquoted path breaks on
+# spaces. The node -e argument has no spaces or double quotes, so it passes through unquoted.
 # Herdr requires unique pane ids; each mode therefore has POSIX and Windows entries.
 [[panes]]
 id = "review"
@@ -46,7 +49,7 @@ id = "review-windows"
 title = "hunk review"
 placement = "split"
 platforms = ["windows"]
-command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\pane.js\" review"]
+command = ["node", "-e", "process.argv.splice(1,0,require('path').join(process.env.HERDR_PLUGIN_ROOT,'dist','bin','pane.js'));import(require('url').pathToFileURL(process.argv[1]).href)", "review"]
 
 [[panes]]
 id = "review-staged"
@@ -60,7 +63,7 @@ id = "review-staged-windows"
 title = "hunk review (staged)"
 placement = "split"
 platforms = ["windows"]
-command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\pane.js\" review:staged"]
+command = ["node", "-e", "process.argv.splice(1,0,require('path').join(process.env.HERDR_PLUGIN_ROOT,'dist','bin','pane.js'));import(require('url').pathToFileURL(process.argv[1]).href)", "review:staged"]
 
 [[panes]]
 id = "review-branch"
@@ -74,7 +77,7 @@ id = "review-branch-windows"
 title = "hunk review (branch)"
 placement = "split"
 platforms = ["windows"]
-command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\pane.js\" review:branch"]
+command = ["node", "-e", "process.argv.splice(1,0,require('path').join(process.env.HERDR_PLUGIN_ROOT,'dist','bin','pane.js'));import(require('url').pathToFileURL(process.argv[1]).href)", "review:branch"]
 
 [[panes]]
 id = "review-commit"
@@ -88,7 +91,7 @@ id = "review-commit-windows"
 title = "hunk review (commit)"
 placement = "split"
 platforms = ["windows"]
-command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\pane.js\" review:commit"]
+command = ["node", "-e", "process.argv.splice(1,0,require('path').join(process.env.HERDR_PLUGIN_ROOT,'dist','bin','pane.js'));import(require('url').pathToFileURL(process.argv[1]).href)", "review:commit"]
 
 [[panes]]
 id = "review-stash"
@@ -102,7 +105,7 @@ id = "review-stash-windows"
 title = "hunk review (stash)"
 placement = "split"
 platforms = ["windows"]
-command = ["cmd", "/c", "node \"%HERDR_PLUGIN_ROOT%\\dist\\bin\\pane.js\" review:stash"]
+command = ["node", "-e", "process.argv.splice(1,0,require('path').join(process.env.HERDR_PLUGIN_ROOT,'dist','bin','pane.js'));import(require('url').pathToFileURL(process.argv[1]).href)", "review:stash"]
 
 [[actions]]
 id = "review"
