@@ -34,6 +34,7 @@ describe("loadConfig", () => {
       "base",
       "default_target",
       "exclude_untracked",
+      "focus",
       "on_states",
       "placement",
       "reuse_pane",
@@ -50,6 +51,12 @@ describe("loadConfig", () => {
   it("ignores an include_rationale left behind in a user's config file", () => {
     const dir = withConfig(`[roundtrip]\ninclude_rationale = false\n`);
     expect(loadConfig(dir).roundtrip).not.toHaveProperty("include_rationale");
+  });
+
+  it("leaves review focus off by default and reads it from the user's config", () => {
+    expect(DEFAULTS.review.focus).toBe(false);
+    expect(loadConfig(withConfig(`[review]\nfocus = true\n`)).review.focus).toBe(true);
+    expect(loadConfig(withConfig(`[review]\nfocus = "yes"\n`)).review.focus).toBe(false);
   });
 
   it("accepts every placement that returns a pane id", () => {

@@ -230,6 +230,7 @@ base              = ""        # branch reviews compare against this ref; empty d
 watch             = false
 placement         = "split"   # overlay | split | tab | zoomed
 exclude_untracked = false
+focus             = false     # focus the review pane after review actions open or reuse it
 
 [roundtrip]
 clear_after_send = true
@@ -260,6 +261,7 @@ extra_args   = []
 | `review.watch`             | `true` / `false`                                | Passes `--watch` to Hunk so an open review refreshes as its underlying source changes.                                       |
 | `review.placement`         | `overlay`, `split`, `tab`, `zoomed`             | Chooses where Herdr opens review panes: over the active pane, beside it, in a new tab, or as a zoomed pane.                  |
 | `review.exclude_untracked` | `true` / `false`                                | Hides untracked files from working-tree, staged, and branch reviews.                                                         |
+| `review.focus`             | `true` / `false`                                | Focuses the review pane after a review action opens it or reuses an existing one. Automatic opens never take focus.          |
 
 </details>
 

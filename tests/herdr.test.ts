@@ -76,6 +76,28 @@ describe("HerdrAdapter", () => {
     expect(calls[0][idx + 1]).toBe("tab");
   });
 
+  it("asks herdr to focus the opened pane only when requested", () => {
+    const calls: string[][] = [];
+    const herdr = new HerdrAdapter("herdr", (args) => {
+      calls.push(args);
+      return { status: 0, stdout: "{}" };
+    });
+    herdr.openPane({ entrypoint: "review", cwd: "/wt/x", placement: "tab" });
+    herdr.openPane({ entrypoint: "review", cwd: "/wt/x", placement: "tab", focus: true });
+    expect(calls[0]).not.toContain("--focus");
+    expect(calls[1]).toContain("--focus");
+  });
+
+  it("focuses a plugin pane by id", () => {
+    const calls: string[][] = [];
+    const herdr = new HerdrAdapter("herdr", (args) => {
+      calls.push(args);
+      return { status: 0, stdout: "{}" };
+    });
+    expect(herdr.focusPane("w1:p7")).toBe(true);
+    expect(calls[0]).toEqual(["plugin", "pane", "focus", "w1:p7"]);
+  });
+
   it("targets a pane when the caller identifies the event source", () => {
     const calls: string[][] = [];
     const herdr = new HerdrAdapter("herdr", (args) => {

@@ -69,6 +69,7 @@ export class HerdrAdapter {
     cwd: string;
     placement: Placement;
     targetPane?: string;
+    focus?: boolean;
   }): string | null {
     const args = [
       "plugin",
@@ -84,11 +85,17 @@ export class HerdrAdapter {
       opts.placement,
     ];
     if (opts.targetPane) args.push("--target-pane", opts.targetPane);
+    if (opts.focus) args.push("--focus");
     const response = this.json(args);
     const result = asObject(response?.result);
     const pluginPane = asObject(result?.plugin_pane);
     const pane = asObject(pluginPane?.pane);
     return asString(pane?.pane_id) ?? null;
+  }
+
+  /** Focuses a plugin pane by positional id and reports whether Herdr accepted the request. */
+  focusPane(paneId: string): boolean {
+    return this.run(["plugin", "pane", "focus", paneId]).status === 0;
   }
 
   /** Closes a pane by positional id and reports whether Herdr accepted the request. */

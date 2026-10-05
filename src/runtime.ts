@@ -33,7 +33,10 @@ export interface Runtime {
   /** Shared directory for the review index and note sidecars. */
   stateDir: string;
   index: ReviewIndex;
-  herdr: Pick<HerdrAdapter, "notify" | "promptAgent" | "openPane" | "closePane" | "reportMetadata">;
+  herdr: Pick<
+    HerdrAdapter,
+    "notify" | "promptAgent" | "openPane" | "focusPane" | "closePane" | "reportMetadata"
+  >;
   hunk: Pick<HunkAdapter, "listComments" | "removeComment" | "reload" | "navigate">;
   /** Config-driven target, equivalent to `targetFor()`. */
   target: Target;
@@ -120,6 +123,7 @@ async function reviewAction(actionId: ReviewActionId, rt: Runtime): Promise<numb
         sent: [],
       });
       await reportReviewMetadata(rt, target.worktree);
+      if (rt.cfg.review.focus) rt.herdr.focusPane(existing.paneId);
       return 0;
     } catch (err) {
       // The pane may be stale; preserve sent history and fall through to a fresh open.
@@ -146,6 +150,7 @@ async function reviewAction(actionId: ReviewActionId, rt: Runtime): Promise<numb
     entrypoint,
     cwd: target.worktree,
     placement: rt.cfg.review.placement,
+    ...(rt.cfg.review.focus ? { focus: true } : {}),
   });
   if (!paneId) {
     return reportFailure(
