@@ -1,7 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { dirname, join, toNamespacedPath } from "node:path";
+import { fileURLToPath } from "node:url";
 import { DEFAULTS } from "../src/config.js";
-import { HerdrAdapter, resolveHunkLauncher } from "../src/herdr.js";
+import { HerdrAdapter, resolveHunkLauncher, withoutNamespacePrefix } from "../src/herdr.js";
+
+const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+
+describe("withoutNamespacePrefix", () => {
+  it("strips the extended-length prefix from a drive path", () => {
+    expect(withoutNamespacePrefix("\\\\?\\C:\\Users\\x\\plugin")).toBe("C:\\Users\\x\\plugin");
+  });
+
+  it("turns an extended-length UNC path back into a plain UNC path", () => {
+    expect(withoutNamespacePrefix("\\\\?\\UNC\\server\\share\\plugin")).toBe(
+      "\\\\server\\share\\plugin",
+    );
+  });
+
+  it("leaves ordinary paths alone", () => {
+    for (const path of ["/plugin", "C:\\plugin", "\\\\server\\share\\plugin", "\\\\.\\pipe\\x"]) {
+      expect(withoutNamespacePrefix(path)).toBe(path);
+    }
+  });
+});
 
 describe("resolveHunkLauncher", () => {
   it("prefers the bundled hunkdiff when bin is auto", () => {
@@ -19,6 +41,22 @@ describe("resolveHunkLauncher", () => {
     const { bin, prefix } = resolveHunkLauncher(DEFAULTS, "/plugin");
     expect([bin, ...prefix].join(" ")).not.toContain(".bin");
   });
+
+  it("never hands node an extended-length plugin root", () => {
+    const { prefix } = resolveHunkLauncher(DEFAULTS, "\\\\?\\C:\\plugin", "node");
+    expect(prefix[0]).toMatch(/^C:\\plugin/);
+  });
+
+  // Herdr can hand Windows plugins a \\?\ root; node must still start the bundled launcher.
+  it.runIf(process.platform === "win32")(
+    "starts the bundled hunk from an extended-length plugin root",
+    () => {
+      const { bin, prefix } = resolveHunkLauncher(DEFAULTS, toNamespacedPath(REPO_ROOT));
+      const r = spawnSync(bin, [...prefix, "--version"], { encoding: "utf8" });
+      expect(r.stderr).not.toContain("EISDIR");
+      expect(r.status).toBe(0);
+    },
+  );
 
   it("honours an explicit binary path, spawning it with no launcher in front", () => {
     const cfg = { ...DEFAULTS, hunk: { ...DEFAULTS.hunk, bin: "/usr/local/bin/hunk" } };

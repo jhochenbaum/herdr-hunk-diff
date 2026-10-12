@@ -26,6 +26,16 @@ export interface HunkLauncher {
   prefix: string[];
 }
 
+/**
+ * Strips Windows' extended-length `\\?\` prefix, which Node cannot resolve as a CommonJS
+ * entrypoint (it fails with EISDIR on the bare drive). UNC roots keep their `\\server\share` form.
+ */
+export function withoutNamespacePrefix(path: string): string {
+  if (/^\\\\\?\\UNC\\/i.test(path)) return `\\\\${path.slice(8)}`;
+  if (/^\\\\\?\\[A-Za-z]:/.test(path)) return path.slice(4);
+  return path;
+}
+
 /** Runs the bundled launcher with Node, bypassing platform-specific npm shims. */
 export function resolveHunkLauncher(
   cfg: PluginConfig,
@@ -35,7 +45,9 @@ export function resolveHunkLauncher(
   if (cfg.hunk.bin !== "auto") return { bin: cfg.hunk.bin, prefix: [] };
   return {
     bin: execPath,
-    prefix: [join(pluginRoot, "node_modules", "hunkdiff", "bin", "hunk.cjs")],
+    prefix: [
+      join(withoutNamespacePrefix(pluginRoot), "node_modules", "hunkdiff", "bin", "hunk.cjs"),
+    ],
   };
 }
 
