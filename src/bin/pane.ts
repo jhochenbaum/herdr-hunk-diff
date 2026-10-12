@@ -1,6 +1,12 @@
 #!/usr/bin/env node
-import { spawn as spawnAsync, spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { readFileSync, rmSync } from "node:fs";
+import {
+  spawn as spawnAsync,
+  spawnSync,
+  type SpawnSyncReturns,
+  type StdioOptions,
+} from "node:child_process";
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isReviewAction, reviewRequestFor, type ReviewRequest } from "../actions.js";
@@ -19,13 +25,61 @@ import { isMainModule } from "./main-guard.js";
 export type SpawnFn = (
   bin: string,
   args: string[],
-  opts: { stdio: "inherit"; cwd: string },
+  opts: { stdio: StdioOptions; cwd: string },
 ) => Pick<SpawnSyncReturns<Buffer>, "status">;
 
 /** Starts saving the worktree's unsent comments and returns a function that stops it. */
 export type WatchFn = (worktree: string, env: NodeJS.ProcessEnv) => () => void;
 
 const noWatch: WatchFn = () => () => {};
+
+/** Lines of hunk's stderr quoted in a failure notification, and their combined length cap. */
+const STDERR_TAIL_LINES = 3;
+const STDERR_TAIL_CHARS = 300;
+
+interface StderrLog {
+  fd: number;
+  /** Closes the log, replays it to this process's stderr, and returns its text. */
+  drain: () => string;
+}
+
+/** Sends hunk's stderr to a file rather than a pipe, so a chatty hunk can never fill a buffer. */
+function openStderrLog(): StderrLog | undefined {
+  try {
+    const dir = mkdtempSync(join(tmpdir(), "hunkdiff-stderr-"));
+    const path = join(dir, "stderr.log");
+    const fd = openSync(path, "w");
+    return {
+      fd,
+      drain: () => {
+        let text = "";
+        try {
+          closeSync(fd);
+          text = readFileSync(path, "utf8");
+          rmSync(dir, { recursive: true, force: true });
+        } catch {
+          // Losing the captured text only costs the notification its detail.
+        }
+        if (text) process.stderr.write(text);
+        return text;
+      },
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Last few non-empty stderr lines, without terminal escapes, fit for a one-line notification. */
+export function stderrTail(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  const plain = text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
+  const lines = plain
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const tail = lines.slice(-STDERR_TAIL_LINES).join(" / ");
+  return tail.length > STDERR_TAIL_CHARS ? `…${tail.slice(-STDERR_TAIL_CHARS)}` : tail;
+}
 
 /** Runs the comment snapshotter beside hunk, since spawnSync blocks this process meanwhile. */
 export const realWatch: WatchFn = (worktree, env) => {
@@ -81,16 +135,19 @@ export function resolveAndRun(
 
   const launcher = resolveHunkLauncher(cfg, env.HERDR_PLUGIN_ROOT ?? cwd);
   const stopWatch = watch(target.worktree, env);
+  const stderrLog = openStderrLog();
   const result = spawn(
     launcher.bin,
     [...launcher.prefix, ...buildLaunchArgs(target, cfg, sidecar)],
     {
-      stdio: "inherit",
+      // Keep stderr: herdr closes the pane on a non-zero exit, taking hunk's error with it.
+      stdio: ["inherit", "inherit", stderrLog?.fd ?? "inherit"],
       cwd: target.worktree,
     },
   );
 
   stopWatch();
+  const stderr = stderrLog?.drain() ?? "";
 
   const unsent = selectUnsent(
     loadSavedComments(stateDir, target.worktree),
@@ -105,9 +162,11 @@ export function resolveAndRun(
 
   // hunk's own stderr dies with the pane herdr closes on a non-zero exit, so report it out of band.
   if (result.status !== 0) {
+    const detail = stderrTail(stderr);
     notify(
       `hunk exited ${result.status ?? "abnormally"} for the ${target.mode} review of ` +
-        `${target.worktree}${target.ref ? ` at ${target.ref}` : ""}.`,
+        `${target.worktree}${target.ref ? ` at ${target.ref}` : ""}` +
+        (detail ? `: ${detail}` : "."),
     );
   }
 
