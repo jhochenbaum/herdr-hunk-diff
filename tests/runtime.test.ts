@@ -71,6 +71,41 @@ describe("dispatch", () => {
     });
   });
 
+  describe("review.focus", () => {
+    const focusCfg = { ...DEFAULTS, review: { ...DEFAULTS.review, focus: true } };
+
+    it("opens the review pane focused", async () => {
+      const rt = runtime({ cfg: focusCfg });
+      rt.herdr.focusPane = vi.fn(() => true);
+      await dispatch("review", rt as any);
+      expect(rt.herdr.openPane).toHaveBeenCalledWith({
+        entrypoint: paneEntrypointFor("review"),
+        cwd: "/wt/x",
+        placement: "split",
+        focus: true,
+      });
+      expect(rt.herdr.focusPane).not.toHaveBeenCalled();
+    });
+
+    it("focuses a reused review pane after reloading it", async () => {
+      const rt = runtime({ cfg: focusCfg });
+      rt.herdr.focusPane = vi.fn(() => true);
+      rt.index.upsert({ worktree: "/wt/x", paneId: "w1:p7", sent: [] });
+      await dispatch("review", rt as any);
+      expect(rt.hunk.reload).toHaveBeenCalled();
+      expect(rt.herdr.openPane).not.toHaveBeenCalled();
+      expect(rt.herdr.focusPane).toHaveBeenCalledWith("w1:p7");
+    });
+
+    it("leaves focus alone by default", async () => {
+      const rt = runtime();
+      rt.herdr.focusPane = vi.fn(() => true);
+      rt.index.upsert({ worktree: "/wt/x", paneId: "w1:p7", sent: [] });
+      await dispatch("review", rt as any);
+      expect(rt.herdr.focusPane).not.toHaveBeenCalled();
+    });
+  });
+
   it("notifies instead of prompting when there are no comments to send", async () => {
     const rt = runtime();
     expect(await dispatch("send-review", rt as any)).toBe(0);
