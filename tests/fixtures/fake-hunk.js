@@ -94,12 +94,10 @@ function drainStdin() {
   });
 }
 
-// The __no_session__ arm MUST stay first: `session get --repo __no_session__` also matches the
-// `session get` arm, and the first match wins.
+// The __no_session__ arm MUST stay first: a command naming that repo also matches its own
+// command arm below, and the first match wins.
 if (joined.includes("__no_session__")) {
   fail("No active Hunk sessions");
-} else if (joined.includes("session get")) {
-  console.log('{"session":{"id":"s1","repo":"/wt/x","path":"/wt/x","source":"diff"}}');
 } else if (joined.includes("session comment list")) {
   // The comment *output* schema, which is NOT the input schema `session comment apply` takes. A
   // payload here in the input shape (`id`/`summary`/`newLine`/`rationale`) is one real hunk cannot
