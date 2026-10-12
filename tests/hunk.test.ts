@@ -388,7 +388,6 @@ describe("HunkAdapter --json placement across every caller", () => {
   }
 
   it("appends --json for the flat commands, which have no separator to precede", async () => {
-    expect(await argvOf((h) => h.getSession("/wt/x"))).toBe("session get --repo /wt/x --json");
     expect(await argvOf((h) => h.listComments("/wt/x", "user"))).toBe(
       "session comment list --repo /wt/x --type user --json",
     );
@@ -500,12 +499,14 @@ describe("HunkAdapter", () => {
 
   it("classifies a missing session as loopback-blocked-or-absent", async () => {
     const broken = fakeHunk();
-    await expect(broken.getSession("__no_session__")).rejects.toBeInstanceOf(HunkUnavailableError);
+    await expect(broken.listComments("__no_session__")).rejects.toBeInstanceOf(
+      HunkUnavailableError,
+    );
   });
 
   it("tags the no-session error with the sandbox loopback hint", async () => {
     const broken = fakeHunk();
-    await expect(broken.getSession("__no_session__")).rejects.toMatchObject({
+    await expect(broken.listComments("__no_session__")).rejects.toMatchObject({
       reason: "no-session",
       message: expect.stringContaining("127.0.0.1:47657"),
     });
@@ -513,14 +514,14 @@ describe("HunkAdapter", () => {
 
   it("surfaces missing-binary when the hunk executable cannot be spawned", async () => {
     const missing = new HunkAdapter("/nonexistent/bin/hunk-does-not-exist");
-    await expect(missing.getSession("/wt/x")).rejects.toMatchObject({
+    await expect(missing.listComments("/wt/x")).rejects.toMatchObject({
       reason: "missing-binary",
     });
   });
 
   it("names the launcher script in the missing-binary message, not just the interpreter", async () => {
     const missing = new HunkAdapter("/nonexistent/node", ["/plugin/hunkdiff/bin/hunk.cjs"]);
-    await expect(missing.getSession("/wt/x")).rejects.toMatchObject({
+    await expect(missing.listComments("/wt/x")).rejects.toMatchObject({
       reason: "missing-binary",
       message: expect.stringContaining("hunk.cjs"),
     });

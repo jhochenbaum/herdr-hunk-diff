@@ -165,16 +165,6 @@ export class HunkAdapter {
     return JSON.parse(await this.run(withJson, stdin)) as T;
   }
 
-  async getSession(repo: string): Promise<{ id: string; repo: string; path: string }> {
-    const r = await this.json<{ session: { id: string; repo: string; path: string } }>([
-      "session",
-      "get",
-      "--repo",
-      repo,
-    ]);
-    return r.session;
-  }
-
   async listComments(repo: string, type: CommentType = "user"): Promise<HunkComment[]> {
     const r = await this.json<{ comments?: unknown }>([
       "session",
