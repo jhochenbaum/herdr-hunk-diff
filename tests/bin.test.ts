@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveAndRun } from "../src/bin/pane.js";
+import { resolveAndRun, stderrTail } from "../src/bin/pane.js";
 import { main } from "../src/bin/action.js";
 import { ReviewIndex } from "../src/index-store.js";
 import { sidecarPath, writeNotesSidecar } from "../src/notes.js";
@@ -32,6 +32,23 @@ describe("pane.ts resolveAndRun", () => {
 
     expect(code).toBe(128);
     expect(notify).toHaveBeenCalledWith(expect.stringContaining("128"));
+  });
+
+  it("quotes the end of hunk's stderr in the failure notification", () => {
+    const configDir = mkdtempSync(join(tmpdir(), "pane-cfg-"));
+    const notify = vi.fn();
+    const spawn = vi.fn((_bin: string, _args: string[], opts: { stdio: unknown }) => {
+      const fd = (opts.stdio as unknown[])[2];
+      expect(typeof fd).toBe("number");
+      writeSync(fd as number, "warming up\nhunk: Failed to initialize OpenTUI render library\n");
+      return { status: 1 };
+    });
+
+    resolveAndRun({ HERDR_PLUGIN_CONFIG_DIR: configDir }, "/wt/resolved", spawn, undefined, notify);
+
+    expect(notify).toHaveBeenCalledWith(
+      expect.stringMatching(/hunk exited 1 .*: warming up \/ hunk: Failed to initialize OpenTUI/),
+    );
   });
 
   it("stays silent when hunk exits cleanly", () => {
@@ -283,6 +300,26 @@ describe("pane.ts resolveAndRun", () => {
         vi.fn(() => ({ status: null })),
       ),
     ).toBe(1);
+  });
+});
+
+describe("stderrTail", () => {
+  it("keeps the last three non-empty lines on one line", () => {
+    expect(stderrTail("a\n\nb\r\nc\nd\n")).toBe("b / c / d");
+  });
+
+  it("drops terminal escape sequences", () => {
+    expect(stderrTail("\x1b[31merror:\x1b[0m bad\n")).toBe("error: bad");
+  });
+
+  it("caps long output, keeping the end", () => {
+    const tail = stderrTail("x".repeat(1000));
+    expect(tail).toHaveLength(301);
+    expect(tail.startsWith("…")).toBe(true);
+  });
+
+  it("is empty when hunk printed nothing", () => {
+    expect(stderrTail("")).toBe("");
   });
 });
 
