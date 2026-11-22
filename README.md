@@ -489,6 +489,32 @@ The pnpm path skips dependency build scripts and uses Hunk's prebuilt platform b
 CI checks formatting, lint, TypeScript compilation, tests, and dependency vulnerabilities.
 It also verifies installation, builds, and the Hunk launcher with npm and pnpm on Linux and Windows.
 
+### Releasing
+
+Releases are published by the [Release workflow](.github/workflows/release.yml) when a
+release pull request lands on `main`:
+
+1. Open a `chore(release): prepare X.Y.Z` pull request that bumps the version in `package.json`,
+   `package-lock.json`, and `herdr-plugin.toml`. Use a minor bump when the release contains a
+   `feat:` change and a patch bump otherwise.
+2. Add a `## Release notes` section to the pull request body:
+
+   ```markdown
+   ## Release notes
+
+   - **Topic:** one sentence on what changed for users. (#123)
+
+   Requires Herdr 0.8.0+, Node 22.12+, and npm 10+ or pnpm 10+. Bundles Hunk X.Y.Z. Supports macOS, Linux, and Windows; bundled Windows binaries support x64 only.
+   ```
+
+3. Merge the pull request. The workflow tags the release commit `vX.Y.Z`, publishes a GitHub
+   release with those notes, and appends a Full changelog link to the previous release.
+
+The workflow skips versions that already have a tag or release. It fails without publishing when
+the manifest versions disagree, the section is missing, or the notes name a different Hunk
+version than `package.json` pins. Fix the pull request body and run the workflow again from the
+Actions tab; enable `dry_run` there to preview the notes without publishing.
+
 ## Prior art
 
 [`persiyanov/herdr-reviewr`](https://github.com/persiyanov/herdr-reviewr) covers similar workflows

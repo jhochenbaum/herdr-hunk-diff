@@ -1,0 +1,108 @@
+name: Release
+
+# Publishes vX.Y.Z when a release pull request that bumps the version lands on main.
+# The notes come from the "## Release notes" section of that pull request's body.
+on:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - herdr-plugin.toml
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print the release notes without publishing
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Read version
+        id: version
+        run: |
+          version="$(node scripts/release.mjs version)"
+          tag="v${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null \
+            || gh release view "${tag}" --repo "${REPOSITORY}" >/dev/null 2>&1; then
+            echo "${tag} already exists; nothing to release."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Find release pull request
+        if: steps.version.outputs.exists == 'false'
+        id: pr
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # The first commit on main that set this version in package.json is the release commit.
+          sha="$(git log main --first-parent --reverse --format=%H -S"\"version\": \"${VERSION}\"" -- package.json | head -n 1)"
+          if [ -z "${sha}" ]; then
+            echo "::error::No commit on main sets version ${VERSION} in package.json"
+            exit 1
+          fi
+          pr="$(gh api "repos/${REPOSITORY}/commits/${sha}/pulls" --jq '[.[] | select(.merged_at != null)][0].number // empty')"
+          if [ -z "${pr}" ]; then
+            echo "::error::Commit ${sha} did not come from a merged pull request"
+            exit 1
+          fi
+          gh pr view "${pr}" --repo "${REPOSITORY}" --json body --jq .body > "${RUNNER_TEMP}/pr-body.md"
+          echo "Release commit ${sha} from #${pr}"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "number=${pr}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes
+        if: steps.version.outputs.exists == 'false'
+        run: |
+          previous="$(gh release view --repo "${REPOSITORY}" --json tagName --jq .tagName 2>/dev/null || true)"
+          node scripts/release.mjs notes \
+            --body-file "${RUNNER_TEMP}/pr-body.md" \
+            --previous-tag "${previous}" \
+            --repository "${REPOSITORY}" > "${RUNNER_TEMP}/notes.md"
+          cat "${RUNNER_TEMP}/notes.md"
+          cat "${RUNNER_TEMP}/notes.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish release
+        if: steps.version.outputs.exists == 'false' && inputs.dry_run != true
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          gh release create "${TAG}" \
+            --repo "${REPOSITORY}" \
+            --target "${SHA}" \
+            --title "${TAG}" \
+            --notes-file "${RUNNER_TEMP}/notes.md"
